@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<title>Working Tittle</title>
+	<script src="js/phaser.js"></script>
+	<style type="text/css">
+		body {
+			margin: 0;
+		}
+	</style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+	var width = 800;
+	var height = 600;
+
+	// Tiles
+	var tileWidth = 32;
+	var tileHeight = 32;
+	var tileCount = 1;
+	var startingTile;
+
+	var buildings;
+
+	var config = {
+		type: Phaser.AUTO,
+		width: width,
+		height: height,
+		physics: {
+				default: 'arcade',
+				arcade: {
+						debug: false
+				}
+		},
+		scene: {
+			preload: preload,
+			create: create,
+			update: update
+		}
+	};
+	var game = new Phaser.Game(config);
+
+	function preload() {
+		this.load.image("tiles", "./img/ground.png?v=1");
+		this.load.image("house", "./img/house.png?v=1");
+	}
+
+	function create() {
+		buildings = this.physics.add.staticGroup();
+
+		let level = [];
+
+		for (var i = 0; i < height / 32; i++) {
+			level.push([]);
+
+			for (var j = 0; j < width / 32; j++) {
+				level[i].push(0);
+			}
+		}
+
+		map = this.make.tilemap({ data: level, tileWidth: 32, tileHeight: 32 });
+		let tiles = map.addTilesetImage("tiles");
+		let layer = map.createDynamicLayer(0, tiles, 0, 0);
+
+		startingTile = map.putTileAt(2, 8, 8);
+		startingTile.isDiscovered = true;
+		startingTile.isEmpty = true;
+
+		map.forEachTile(function (tile) {
+			tile.clickValue = Math.floor(Math.random() * 100 + 1);
+		});
+
+	}
+
+	function update() {
+    var worldPoint = this.input.activePointer.positionToCamera(this.cameras.main);
+
+    var pointerTileX = map.worldToTileX(worldPoint.x);
+    var pointerTileY = map.worldToTileY(worldPoint.y);
+
+    if (this.input.manager.activePointer.isDown) {
+      var tile = map.getTileAt(pointerTileX, pointerTileY);
+
+      if (tile && tile.isDiscovered) {
+				if (tile.isEmpty) {
+				 	buildings.create(pointerTileX * tileWidth + tileWidth / 2, pointerTileY * tileHeight + tileHeight / 2, "house");
+					console.log("Created");
+					tile.isEmpty = false;
+				} else {
+					buildings.children.entries[0].destroy();
+					tile.isEmpty = true;
+				}
+      }
+    }
+	}
+
+	function weightedRandom(weights) {
+		if (!weights || weights.length < 1) {
+			return;
+		}
+
+		var number = Math.random();
+		var segmentSum = weights[0];
+		var weightSegment = 0;
+
+		for (var i = 1; i < weights.length; i++){
+			if (number > segmentSum) {
+				segmentSum += weights[i];
+				weightSegment++;
+			} else {
+				break;
+			}
+		}
+
+		return weightSegment;
+	}
+
+</script>
+
+</body>
+</html>
