@@ -14,16 +14,22 @@
 
 <script type="text/javascript">
 
-	var width = 800;
-	var height = 600;
+	var width = window.screen.width * 0.9;
+	var height = window.screen.height * 0.75;
+	var marker;
 
 	// Tiles
-	var tileWidth = 32;
-	var tileHeight = 32;
+	var tileSize = 64;
 	var tileCount = 1;
 	var startingTile;
 
+	// Resources
+	var resourceSize = 16;
+	var resourcePerAxis = tileSize / resourceSize;
+
+	// Entities
 	var buildings;
+	var resources;
 
 	var config = {
 		type: Phaser.AUTO,
@@ -46,28 +52,32 @@
 	function preload() {
 		this.load.image("tiles", "./img/ground.png?v=1");
 		this.load.image("house", "./img/house.png?v=1");
+		this.load.spritesheet("resources", "./img/resources.png?v=1", {frameWidth: resourceSize, frameHeight: resourceSize});
 	}
 
 	function create() {
 		buildings = this.physics.add.staticGroup();
+		resources = this.physics.add.staticGroup();
 
 		let level = [];
 
-		for (var i = 0; i < height / 32; i++) {
+		for (let i = 0; i < height / tileSize; i++) {
 			level.push([]);
 
-			for (var j = 0; j < width / 32; j++) {
+			for (let j = 0; j < width / tileSize; j++) {
 				level[i].push(0);
 			}
 		}
 
-		map = this.make.tilemap({ data: level, tileWidth: 32, tileHeight: 32 });
+		map = this.make.tilemap({ data: level, tileWidth: tileSize, tileHeight: tileSize });
 		let tiles = map.addTilesetImage("tiles");
 		let layer = map.createDynamicLayer(0, tiles, 0, 0);
 
-		startingTile = map.putTileAt(2, 8, 8);
-		startingTile.isDiscovered = true;
-		startingTile.isEmpty = true;
+    marker = this.add.graphics();
+    marker.lineStyle(3, 0x99f, 1);
+    marker.strokeRect(0, 0, resourceSize, resourceSize);
+
+		startingTile = createTile(2, 2, 2);
 
 		map.forEachTile(function (tile) {
 			tile.clickValue = Math.floor(Math.random() * 100 + 1);
@@ -80,21 +90,47 @@
 
     var pointerTileX = map.worldToTileX(worldPoint.x);
     var pointerTileY = map.worldToTileY(worldPoint.y);
+		var pointerX = worldPoint.x;
+		var pointerY = worldPoint.y;
 
-    if (this.input.manager.activePointer.isDown) {
-      var tile = map.getTileAt(pointerTileX, pointerTileY);
+    var tile = map.getTileAt(map.worldToTileX(worldPoint.x), map.worldToTileY(worldPoint.y));
 
-      if (tile && tile.isDiscovered) {
-				if (tile.isEmpty) {
-				 	buildings.create(pointerTileX * tileWidth + tileWidth / 2, pointerTileY * tileHeight + tileHeight / 2, "house");
-					console.log("Created");
-					tile.isEmpty = false;
-				} else {
-					buildings.children.entries[0].destroy();
-					tile.isEmpty = true;
-				}
-      }
+		if (tile.isDiscovered) {
+			marker.setVisible(true);
+	    marker.x = pointerX - pointerX % resourceSize;
+	    marker.y = pointerY - pointerY % resourceSize;
+		} else {
+			marker.setVisible(false);
+		}
+
+    if (this.input.manager.activePointer.isDown && tile && tile.isDiscovered && tile.isEmpty) {
+		 	// buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
+			// tile.isEmpty = false;
     }
+		if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered) {
+			tile.isDiscovered = true;
+			createTile(2, pointerTileX, pointerTileY);
+		}
+	}
+
+	function createTile(layout, tileX, tileY) {
+		tile = map.putTileAt(layout, tileX, tileY);
+		tile.isDiscovered = true;
+		tile.isEmpty = true;
+		tile.resources = [];
+		tile.freeFields = Array.from(Array(Math.pow(tileSize / resourceSize, 2)).keys());
+
+		for (let i = 0; i < 4; i++) {
+			var fieldId = tile.freeFields[Math.floor(Math.random() * tile.freeFields.length)];
+			tile.freeFields = tile.freeFields.filter(i => i != fieldId);
+
+			let xLoc = tile.pixelX + (fieldId % resourcePerAxis) * resourceSize + resourceSize / 2;
+			let yLoc = tile.pixelY + (Math.floor(fieldId / resourcePerAxis)) * resourceSize + resourceSize / 2;
+
+			tile.resources.push(resources.create(xLoc, yLoc, "resources", weightedRandom([0.25, 0.75])));
+		}
+
+		return tile;
 	}
 
 	function weightedRandom(weights) {
