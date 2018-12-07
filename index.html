@@ -1,158 +1,222 @@
 <!doctype html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8" />
-	<title>Working Tittle</title>
-	<script src="js/phaser.js"></script>
-	<style type="text/css">
-		body {
-			margin: 0;
-		}
-	</style>
+  <meta charset="UTF-8" />
+  <title>Working Tittle</title>
+  <script src="js/phaser.js"></script>
+  <script src="js/player.js"></script>
+  <style type="text/css">
+    body {
+      margin: 0;
+    }
+  </style>
 </head>
 <body>
 
 <script type="text/javascript">
 
-	var width = window.screen.width * 0.9;
-	var height = window.screen.height * 0.75;
-	var marker;
+  var width = window.screen.width * 0.9;
+  var height = window.screen.height * 0.75;
+  var marker;
 
-	// Tiles
-	var tileSize = 64;
-	var tileCount = 1;
-	var startingTile;
+  // Tiles
+  var tileSize = 64;
+  var tileCount = 1;
+  var startingTile;
 
-	// Resources
-	var resourceSize = 16;
-	var resourcePerAxis = tileSize / resourceSize;
+  // Resources
+  var resourceSize = 16;
+  var resourcePerAxis = tileSize / resourceSize;
 
-	// Entities
-	var buildings;
-	var resources;
+  // Entities
+  var buildings;
+  var resources;
 
-	var config = {
-		type: Phaser.AUTO,
-		width: width,
-		height: height,
-		physics: {
-				default: 'arcade',
-				arcade: {
-						debug: false
-				}
-		},
-		scene: {
-			preload: preload,
-			create: create,
-			update: update
-		}
-	};
-	var game = new Phaser.Game(config);
+  // Player
+  var player;
 
-	function preload() {
-		this.load.image("tiles", "./img/ground.png?v=1");
-		this.load.image("house", "./img/house.png?v=1");
-		this.load.spritesheet("resources", "./img/resources.png?v=1", {frameWidth: resourceSize, frameHeight: resourceSize});
-	}
+  var config = {
+    type: Phaser.AUTO,
+    width: width,
+    height: height,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            debug: false
+        }
+    },
+    scene: {
+      preload: preload,
+      create: create,
+      update: update
+    }
+  };
+  var game = new Phaser.Game(config);
 
-	function create() {
-		buildings = this.physics.add.staticGroup();
-		resources = this.physics.add.staticGroup();
+  function preload() {
+    this.load.image("tiles", "./img/ground.png?v=1");
+    this.load.image("house", "./img/house.png?v=1");
+    this.load.spritesheet("resources", "./img/resources.png?v=1", {frameWidth: resourceSize, frameHeight: resourceSize});
+  }
 
-		let level = [];
+  function create() {
+    buildings = this.physics.add.staticGroup();
+    resources = this.physics.add.staticGroup();
+    player = new Player();
 
-		for (let i = 0; i < height / tileSize; i++) {
-			level.push([]);
+    let level = [];
 
-			for (let j = 0; j < width / tileSize; j++) {
-				level[i].push(0);
-			}
-		}
+    for (let i = 0; i < height / tileSize; i++) {
+      level.push([]);
 
-		map = this.make.tilemap({ data: level, tileWidth: tileSize, tileHeight: tileSize });
-		let tiles = map.addTilesetImage("tiles");
-		let layer = map.createDynamicLayer(0, tiles, 0, 0);
+      for (let j = 0; j < width / tileSize; j++) {
+        level[i].push(0);
+      }
+    }
+
+    map = this.make.tilemap({ data: level, tileWidth: tileSize, tileHeight: tileSize });
+    let tiles = map.addTilesetImage("tiles");
+    let layer = map.createDynamicLayer(0, tiles, 0, 0);
 
     marker = this.add.graphics();
     marker.lineStyle(3, 0x99f, 1);
     marker.strokeRect(0, 0, resourceSize, resourceSize);
 
-		startingTile = createTile(2, 2, 2);
+    startingTile = createTile(2, 2, 2);
+  }
 
-		map.forEachTile(function (tile) {
-			tile.clickValue = Math.floor(Math.random() * 100 + 1);
-		});
+  function update() {
+    let worldPoint = this.input.activePointer.positionToCamera(this.cameras.main);
 
-	}
-
-	function update() {
-    var worldPoint = this.input.activePointer.positionToCamera(this.cameras.main);
-
-    var pointerTileX = map.worldToTileX(worldPoint.x);
-    var pointerTileY = map.worldToTileY(worldPoint.y);
-		var pointerX = worldPoint.x;
-		var pointerY = worldPoint.y;
+    let pointerTileX = map.worldToTileX(worldPoint.x);
+    let pointerTileY = map.worldToTileY(worldPoint.y);
+    let pointerX = worldPoint.x;
+    let pointerY = worldPoint.y;
+    let markerX = pointerX - pointerX % resourceSize;
+    let markerY = pointerY - pointerY % resourceSize;
 
     var tile = map.getTileAt(map.worldToTileX(worldPoint.x), map.worldToTileY(worldPoint.y));
 
-		if (tile.isDiscovered) {
-			marker.setVisible(true);
-	    marker.x = pointerX - pointerX % resourceSize;
-	    marker.y = pointerY - pointerY % resourceSize;
-		} else {
-			marker.setVisible(false);
-		}
+    if (tile && tile.isDiscovered) {
+      marker.setVisible(true);
+      marker.x = markerX;
+      marker.y = markerY;
+    } else {
+      marker.setVisible(false);
+    }
 
     if (this.input.manager.activePointer.isDown && tile && tile.isDiscovered && tile.isEmpty) {
-		 	// buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
-			// tile.isEmpty = false;
+       // buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
+      // tile.isEmpty = false;
     }
-		if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered) {
-			tile.isDiscovered = true;
-			createTile(2, pointerTileX, pointerTileY);
-		}
-	}
+    if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered) {
+      tile.isDiscovered = true;
+      createTile(2, pointerTileX, pointerTileY);
+    }
+  }
 
-	function createTile(layout, tileX, tileY) {
-		tile = map.putTileAt(layout, tileX, tileY);
-		tile.isDiscovered = true;
-		tile.isEmpty = true;
-		tile.resources = [];
-		tile.freeFields = Array.from(Array(Math.pow(tileSize / resourceSize, 2)).keys());
+  function createTile(layout, tileX, tileY) {
+    tile = map.putTileAt(layout, tileX, tileY);
+    tile.isDiscovered = true;
+    tile.isEmpty = true;
+    tile.resources = [];
+    tile.freeFields = Array.from(Array(Math.pow(tileSize / resourceSize, 2)).keys());
 
-		for (let i = 0; i < 4; i++) {
-			var fieldId = tile.freeFields[Math.floor(Math.random() * tile.freeFields.length)];
-			tile.freeFields = tile.freeFields.filter(i => i != fieldId);
+    for (let i = 0; i < 4; i++) {
+      var fieldId = tile.freeFields[Math.floor(Math.random() * tile.freeFields.length)];
+      tile.freeFields = tile.freeFields.filter(i => i != fieldId);
 
-			let xLoc = tile.pixelX + (fieldId % resourcePerAxis) * resourceSize + resourceSize / 2;
-			let yLoc = tile.pixelY + (Math.floor(fieldId / resourcePerAxis)) * resourceSize + resourceSize / 2;
+      let xLoc = tile.pixelX + (fieldId % resourcePerAxis) * resourceSize + resourceSize / 2;
+      let yLoc = tile.pixelY + (Math.floor(fieldId / resourcePerAxis)) * resourceSize + resourceSize / 2;
 
-			tile.resources.push(resources.create(xLoc, yLoc, "resources", weightedRandom([0.25, 0.75])));
-		}
+      let typeIndex = weightedRandom([0.75, 0.25]);
+      tile.resources.push(createResource(xLoc, yLoc, typeIndex));
+    }
 
-		return tile;
-	}
+    return tile;
+  }
 
-	function weightedRandom(weights) {
-		if (!weights || weights.length < 1) {
-			return;
-		}
+  function createResource(xLoc, yLoc, typeIndex) {
+    switch(typeIndex) {
+    case 0:
+      return createWoodResource(xLoc, yLoc, typeIndex);
+    case 1:
+      return createCopperResource(xLoc, yLoc, typeIndex);
+    default:
+      return createWoodResource(xLoc, yLoc, typeIndex);
+    }
+  }
 
-		var number = Math.random();
-		var segmentSum = weights[0];
-		var weightSegment = 0;
+  function createWoodResource(xLoc, yLoc, typeIndex) {
+    let res = resources.create(xLoc, yLoc, "resources", typeIndex);
+    res.setInteractive();
 
-		for (var i = 1; i < weights.length; i++){
-			if (number > segmentSum) {
-				segmentSum += weights[i];
-				weightSegment++;
-			} else {
-				break;
-			}
-		}
+    res.typeDesc = "wood";
+    res.clickValue = Math.floor(Math.random() * 5) + 1;
+    res.currCharges = Math.floor(Math.random() * 6);
+    res.baseMiningChance = Math.random() * 0.1 + 0.8;
+    res.miningChance = res.baseMiningChance;
+    res.chanceIncrease = Math.random() * 0.05 + 0.025;
+    res.on('pointerdown', function(pointer) {
+      if (Math.random() < res.miningChance) {
+        player.wood += res.clickValue;
+        console.log("Success!");
+        console.log("total Wood of Player: " + player.wood);
+        res.miningChance = res.baseMiningChance;
+      } else {
+        res.miningChance += res.chanceIncrease;
+        console.log("Fail! New Miningchance is : " + res.miningChance);
+      }
+    })
 
-		return weightSegment;
-	}
+    return res;
+  }
+
+  function createCopperResource(xLoc, yLoc, typeIndex) {
+    let res = resources.create(xLoc, yLoc, "resources", typeIndex);
+    res.setInteractive();
+
+    res.typeDesc = "copper";
+    res.clickValue = Math.floor(Math.random() * 3) + 1;
+    res.currCharges = Math.floor(Math.random() * 6);
+    res.baseMiningChance = Math.random() * 0.2 + 0.21;
+    res.miningChance = res.baseMiningChance;
+    res.chanceIncrease = Math.random() * 0.05 + 0.025;
+    res.on('pointerdown', function(pointer) {
+      if (Math.random() < res.miningChance) {
+        player.copper += res.clickValue;
+        console.log("Success! At Miningchance: " + res.miningChance);
+        console.log("total Copper of Player: " + player.copper);
+        res.miningChance = res.baseMiningChance;
+      } else {
+        res.miningChance += res.chanceIncrease;
+        console.log("Fail! New Miningchance is: " + res.miningChance);
+      }
+    })
+
+    return res;
+  }
+
+  function weightedRandom(weights) {
+    if (!weights || weights.length < 1) {
+      return;
+    }
+
+    var number = Math.random();
+    var segmentSum = weights[0];
+    var weightSegment = 0;
+
+    for (var i = 1; i < weights.length; i++){
+      if (number > segmentSum) {
+        segmentSum += weights[i];
+        weightSegment++;
+      } else {
+        break;
+      }
+    }
+
+    return weightSegment;
+  }
 
 </script>
 
