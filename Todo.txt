@@ -1,0 +1,28 @@
+Res-Layer:
+	Mining Shape
+	Manpower
+	Depletion/Refill
+	Unify nodes
+	
+	+Spikes:
+		CritNodes
+		
+
+	+Synergy:
+		Trade:
+			Tools
+
+
+
+Trade-Layer:
+	+Res: Goods
+
+
+
+War-Layer:
+	Zones
+
+
+
+Entitiy-Layer:
+	Gemwordsgrid

@@ -5,6 +5,8 @@
   <title>Working Tittle</title>
   <script src="js/phaser.js"></script>
   <script src="js/player.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="css/default.css">
   <style type="text/css">
     body {
       margin: 0;
@@ -15,8 +17,8 @@
 
 <script type="text/javascript">
 
-  var width = window.screen.width * 0.9;
-  var height = window.screen.height * 0.75;
+  var width = window.screen.width;
+  var height = window.screen.height;
   var marker;
 
   // Tiles
@@ -83,6 +85,14 @@
     marker.strokeRect(0, 0, resourceSize, resourceSize);
 
     startingTile = createTile(2, 2, 2);
+
+    this.input.on('gameobjectover', function(pointer, gameObject) {
+      updateTooltip(pointer, gameObject);
+    });
+
+    this.input.on('gameobjectout', function(pointer, gameObject) {
+      $(".tooltip").hide();
+    });
   }
 
   function update() {
@@ -115,6 +125,15 @@
     }
   }
 
+  function updateTooltip(pointer, gameObject) {
+    if (pointer) {
+      $(".tooltip").show().css({top: pointer.position.y - 60, left: pointer.position.x + 20});
+    }
+    $("#tooltip-value").text(gameObject.clickValue);
+    $("#tooltip-chance").text(gameObject.miningChance);
+    $("#tooltip-charges").text(gameObject.currCharges);
+  }
+
   function createTile(layout, tileX, tileY) {
     tile = map.putTileAt(layout, tileX, tileY);
     tile.isDiscovered = true;
@@ -139,59 +158,65 @@
   function createResource(xLoc, yLoc, typeIndex) {
     switch(typeIndex) {
     case 0:
-      return createWoodResource(xLoc, yLoc, typeIndex);
+      return createMaterialResource(xLoc, yLoc, typeIndex);
     case 1:
-      return createCopperResource(xLoc, yLoc, typeIndex);
+      return createManpowerResource(xLoc, yLoc, typeIndex);
     default:
-      return createWoodResource(xLoc, yLoc, typeIndex);
+      return createMaterialResource(xLoc, yLoc, typeIndex);
     }
   }
 
-  function createWoodResource(xLoc, yLoc, typeIndex) {
+  function createMaterialResource(xLoc, yLoc, typeIndex) {
     let res = resources.create(xLoc, yLoc, "resources", typeIndex);
     res.setInteractive();
 
-    res.typeDesc = "wood";
+    res.typeDesc = "material";
     res.clickValue = Math.floor(Math.random() * 5) + 1;
-    res.currCharges = Math.floor(Math.random() * 6);
+    res.currCharges = Math.floor(Math.random() * 600) + 1;
     res.baseMiningChance = Math.random() * 0.1 + 0.8;
     res.miningChance = res.baseMiningChance;
     res.chanceIncrease = Math.random() * 0.05 + 0.025;
+
     res.on('pointerdown', function(pointer) {
-      if (Math.random() < res.miningChance) {
-        player.wood += res.clickValue;
-        console.log("Success!");
-        console.log("total Wood of Player: " + player.wood);
+      if (res.currCharges > 0 && Math.random() < res.miningChance) {
+        player.material += res.clickValue;
         res.miningChance = res.baseMiningChance;
+        $("#table-material-value").text(player.material);
+        res.currCharges--;
+      } else if (res.currCharges == 0) {
+        //TODO Tint
       } else {
         res.miningChance += res.chanceIncrease;
-        console.log("Fail! New Miningchance is : " + res.miningChance);
       }
+      updateTooltip(null, res);
     })
 
     return res;
   }
 
-  function createCopperResource(xLoc, yLoc, typeIndex) {
+  function createManpowerResource(xLoc, yLoc, typeIndex) {
     let res = resources.create(xLoc, yLoc, "resources", typeIndex);
     res.setInteractive();
 
-    res.typeDesc = "copper";
+    res.typeDesc = "manpower";
     res.clickValue = Math.floor(Math.random() * 3) + 1;
-    res.currCharges = Math.floor(Math.random() * 6);
+    res.currCharges = Math.floor(Math.random() * 50) + 1;
     res.baseMiningChance = Math.random() * 0.2 + 0.21;
     res.miningChance = res.baseMiningChance;
     res.chanceIncrease = Math.random() * 0.05 + 0.025;
+
     res.on('pointerdown', function(pointer) {
-      if (Math.random() < res.miningChance) {
-        player.copper += res.clickValue;
-        console.log("Success! At Miningchance: " + res.miningChance);
-        console.log("total Copper of Player: " + player.copper);
+      if (res.currCharges > 0 && Math.random() < res.miningChance) {
+        player.manpower += res.clickValue;
         res.miningChance = res.baseMiningChance;
+        $("#table-manpower-value").text(player.manpower);
+        res.currCharges--;
+      } else if (res.currCharges == 0) {
+        //TODO Tint
       } else {
         res.miningChance += res.chanceIncrease;
-        console.log("Fail! New Miningchance is: " + res.miningChance);
       }
+      updateTooltip(null, res);
     })
 
     return res;
@@ -219,6 +244,56 @@
   }
 
 </script>
+
+<div class="resourceBoard">
+  <table id="resourceTable">
+    <tr>
+      <td>
+        Material
+      </td>
+      <td id="table-material-value">
+        0
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Manpower
+      </td>
+      <td id="table-manpower-value">
+        0
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="tooltip">
+  <table id="tooltipTable">
+    <tr>
+      <td>
+        Mining Value
+      </td>
+      <td id="tooltip-value">
+        0
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Mining Chance
+      </td>
+      <td id="tooltip-chance">
+        0
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Current Charges
+      </td>
+      <td id="tooltip-charges">
+        0
+      </td>
+    </tr>
+  </table>
+</div>
 
 </body>
 </html>

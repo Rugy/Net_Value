@@ -1,0 +1,28 @@
+.resourceBoard {
+  position: absolute;
+  display: inline;
+  font-family: monospace;
+  right: 0;
+  top: 50px;
+  border: 5px solid transparent;
+  border-image: linear-gradient(to bottom right, darkblue, blue, lightyellow) 1;
+  color: darkblue;
+}
+
+.resourceBoard > table {
+  background-color: lightblue;
+  font-size: 20px;
+}
+
+.resourceBoard > table > tbody > tr > td:first-child {
+  padding-right: 20px;
+  font-weight: bold;
+}
+
+.tooltip {
+  display: none;
+  position: absolute;
+  background-color: lightblue;
+  border: 5px solid blue;
+  border-radius: 10px;
+}
