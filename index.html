@@ -20,6 +20,7 @@
   var width = window.screen.width;
   var height = window.screen.height;
   var marker;
+  var frame = 0;
 
   // Tiles
   var tileSize = 64;
@@ -96,6 +97,7 @@
   }
 
   function update() {
+    frame++;
     let worldPoint = this.input.activePointer.positionToCamera(this.cameras.main);
 
     let pointerTileX = map.worldToTileX(worldPoint.x);
@@ -116,12 +118,22 @@
     }
 
     if (this.input.manager.activePointer.isDown && tile && tile.isDiscovered && tile.isEmpty) {
-       // buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
+      // buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
       // tile.isEmpty = false;
     }
     if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered) {
       tile.isDiscovered = true;
       createTile(2, pointerTileX, pointerTileY);
+    }
+
+    if (frame % 50 == 0) {
+      resources.children.iterate(function(child) {
+        if (child.currCharges == 0 && child.isTinted) {
+          child.clearTint();
+        }
+
+        child.currCharges++;
+      });
     }
   }
 
@@ -130,7 +142,7 @@
       $(".tooltip").show().css({top: pointer.position.y - 60, left: pointer.position.x + 20});
     }
     $("#tooltip-value").text(gameObject.clickValue);
-    $("#tooltip-chance").text(gameObject.miningChance);
+    $("#tooltip-chance").text((Math.round(gameObject.miningChance + "e+2")  + "e-2") * 100 + "%");
     $("#tooltip-charges").text(gameObject.currCharges);
   }
 
@@ -183,10 +195,13 @@
         res.miningChance = res.baseMiningChance;
         $("#table-material-value").text(player.material);
         res.currCharges--;
-      } else if (res.currCharges == 0) {
-        //TODO Tint
+        if (res.currCharges == 0 && !res.isTinted) {
+          res.setTintFill(0x444444);
+        }
       } else {
-        res.miningChance += res.chanceIncrease;
+        if (!res.isTinted) {
+          res.miningChance += res.chanceIncrease;
+        }
       }
       updateTooltip(null, res);
     })
@@ -211,10 +226,13 @@
         res.miningChance = res.baseMiningChance;
         $("#table-manpower-value").text(player.manpower);
         res.currCharges--;
-      } else if (res.currCharges == 0) {
-        //TODO Tint
+        if (res.currCharges == 0 && !res.isTinted) {
+          res.setTintFill(0x444444);
+        }
       } else {
-        res.miningChance += res.chanceIncrease;
+        if (!res.isTinted) {
+          res.miningChance += res.chanceIncrease;
+        }
       }
       updateTooltip(null, res);
     })
