@@ -1,6 +1,7 @@
 Res-Layer:
 	Mining Shape
-	Manpower
+	Manpower -> explore and upgrade
+	Machinepower -> Automat Mine
 	Depletion/Refill
 	Unify nodes
 	

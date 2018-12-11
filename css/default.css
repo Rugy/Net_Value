@@ -28,7 +28,22 @@
   padding-right: 10px;
 }
 
-.tooltip:hover {
-  display: none;
-  top: 0px;
+/*
+#showBuildingsButton {
+  position: absolute;
+  bottom: 50px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  background-color: lightblue;
+  font-size: 1.5em;
+  border-color: blue;
+  border-width: 3px;
+  border-radius: 5px;
 }
+
+#showBuildingsButton:active {
+  border-color: black;
+  background-color: blue;
+  color: lightblue;
+}
+*/

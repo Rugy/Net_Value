@@ -19,8 +19,8 @@
 
   var width = window.screen.width;
   var height = window.screen.height;
-  var marker;
   var frame = 0;
+  var showBuildings = false;
 
   // Tiles
   var tileSize = 64;
@@ -38,6 +38,11 @@
   // Player
   var player;
 
+  // Graphics
+  var marker;
+  var buildingsPane;
+  var camera;
+
   var config = {
     type: Phaser.AUTO,
     width: width,
@@ -54,11 +59,13 @@
       update: update
     }
   };
+
   var game = new Phaser.Game(config);
 
   function preload() {
     this.load.image("tiles", "./img/ground.png?v=1");
     this.load.image("house", "./img/house.png?v=1");
+    this.load.image("buildingsPane", "./img/buildings-pane.png?v=1");
     this.load.spritesheet("resources", "./img/resources.png?v=1", {frameWidth: resourceSize, frameHeight: resourceSize});
   }
 
@@ -85,6 +92,9 @@
     marker.lineStyle(3, 0x99f, 1);
     marker.strokeRect(0, 0, resourceSize, resourceSize);
 
+    camera = this.cameras;
+    buildingsPane = this.add.image(camera.main.midPoint.x, 750, "buildingsPane");
+
     startingTile = createTile(2, 2, 2);
 
     this.input.on('gameobjectover', function(pointer, gameObject) {
@@ -94,6 +104,22 @@
     this.input.on('gameobjectout', function(pointer, gameObject) {
       $(".tooltip").hide();
     });
+
+    /*
+    $("#showBuildingsButton").click(function() {
+      if (!showBuildings) {
+        $(this).animate({
+          "bottom": "+=100px"
+        }, "slow");
+        showBuildings = true;
+      } else {
+        $(this).animate({
+          "bottom": "-=100px"
+        }, "slow");
+        showBuildings = false;
+      }
+    });
+    */
   }
 
   function update() {
@@ -121,14 +147,16 @@
       // buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
       // tile.isEmpty = false;
     }
-    if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered) {
+    if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered && player.manpower >= 10) {
       tile.isDiscovered = true;
       createTile(2, pointerTileX, pointerTileY);
+      player.manpower -= 10;
+      updateResourceBoard();
     }
 
     if (frame % 50 == 0) {
       resources.children.iterate(function(child) {
-        if (child.currCharges == 0 && child.isTinted) {
+        if (child.currCharges <= 0 && child.isTinted) {
           child.clearTint();
         }
 
@@ -144,6 +172,11 @@
     $("#tooltip-value").text(gameObject.clickValue);
     $("#tooltip-chance").text((Math.round(gameObject.miningChance + "e+2")  + "e-2") * 100 + "%");
     $("#tooltip-charges").text(gameObject.currCharges);
+  }
+
+  function updateResourceBoard() {
+    $("#table-material-value").text(player.material);
+    $("#table-manpower-value").text(player.manpower);
   }
 
   function createTile(layout, tileX, tileY) {
@@ -193,7 +226,7 @@
       if (res.currCharges > 0 && Math.random() < res.miningChance) {
         player.material += res.clickValue;
         res.miningChance = res.baseMiningChance;
-        $("#table-material-value").text(player.material);
+        updateResourceBoard();
         res.currCharges--;
         if (res.currCharges == 0 && !res.isTinted) {
           res.setTintFill(0x444444);
@@ -224,7 +257,7 @@
       if (res.currCharges > 0 && Math.random() < res.miningChance) {
         player.manpower += res.clickValue;
         res.miningChance = res.baseMiningChance;
-        $("#table-manpower-value").text(player.manpower);
+        updateResourceBoard();
         res.currCharges--;
         if (res.currCharges == 0 && !res.isTinted) {
           res.setTintFill(0x444444);
@@ -260,7 +293,6 @@
 
     return weightSegment;
   }
-
 </script>
 
 <div class="resourceBoard">
