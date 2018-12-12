@@ -31,7 +31,9 @@
   var resourcesPerTile = 4;
   var resourceSize = 16;
   var resourcePerAxis = tileSize / resourceSize;
-  var resourceMinAppearances = [0, 1];
+  var resourceMinAppearances = [3, 1];
+  var materialDesc = new Map();
+  var manpowerDesc = new Map();
 
   // Entities
   var buildings;
@@ -70,6 +72,32 @@
     this.load.image("house", "./img/house.png?v=1");
     this.load.image("buildingsPane", "./img/buildings-pane.png?v=1");
     this.load.spritesheet("resources", "./img/resources.png?v=1", {frameWidth: resourceSize, frameHeight: resourceSize});
+
+    fillResourceDesc();
+  }
+
+  function fillResourceDesc() {
+    materialDesc.set("typeIndex", 0);
+    materialDesc.set("typeDesc", "material");
+    materialDesc.set("harvestMin", 1);
+    materialDesc.set("harvestRange", 5);
+    materialDesc.set("chargesMin", 1);
+    materialDesc.set("chargesRange", 100);
+    materialDesc.set("miningMin", 0.6);
+    materialDesc.set("miningRange", 0.4);
+    materialDesc.set("chanceMin", 0.025);
+    materialDesc.set("chanceRange", 0.05);
+
+    manpowerDesc.set("typeIndex", 1);
+    manpowerDesc.set("typeDesc", "manpower");
+    manpowerDesc.set("harvestMin", 1);
+    manpowerDesc.set("harvestRange", 2);
+    manpowerDesc.set("chargesMin", 10);
+    manpowerDesc.set("chargesRange", 20);
+    manpowerDesc.set("miningMin", 0.21);
+    manpowerDesc.set("miningRange", 0.2);
+    manpowerDesc.set("chanceMin", 0.025);
+    manpowerDesc.set("chanceRange", 0.1);
   }
 
   function create() {
@@ -100,17 +128,20 @@
     buildingsPane.setDepth(3);
     house = this.add.image(buildingsPane.x - buildingsPane.width / 2 + 25, buildingsPane.y, "house").setInteractive();
     house.setDepth(4);
+    house.cost = [30];
     house.tooltipText = "This is a house that automatically mines one random node";
     house.isSelected = false;
     house.on("pointerover", function(pointer) {
       updateTooltip(pointer, null, this);
       house.isSelected = true;
+      house.setTintFill(0x0000ff);
     });
     house.on("pointerout", function(pointer) {
       $("#buildingTooltip").hide();
     });
 
     startingTile = createTile(2, 2, 2);
+    updateResourceBoard();
   }
 
   function update() {
@@ -134,10 +165,15 @@
       marker.setVisible(false);
     }
 
-    if (this.input.manager.activePointer.isDown && tile && tile.isDiscovered && tile.isEmpty && house.isSelected) {
-      buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
+    if (this.input.manager.activePointer.isDown && tile && tile.isDiscovered && tile.isEmpty && house.isSelected && player.material >= house.cost[0]) {
+      var newBuilding = buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
       tile.isEmpty = false;
+      newBuilding.isSelected = false;
+      newBuilding.usedTile = tile;
       house.isSelected = false;
+      house.clearTint();
+      player.material -= house.cost[0];
+      updateResourceBoard();
     }
     if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered && player.manpower >= 10 && !house.isSelected) {
       tile.isDiscovered = true;
@@ -155,6 +191,21 @@
         child.currCharges++;
       });
     }
+    if (frame % 20 == 0) {
+      buildings.children.iterate(function(child) {
+        mineTileRandomly(child.usedTile);
+      });
+    }
+  }
+
+  function mineTileRandomly(tile) {
+    let res = tile.resources[Math.floor(Math.random() * 4)];
+    harvestResource(res);
+  }
+
+  function harvestResource(resource) {
+    player.addResourceValue(resource);
+    updateResourceBoard();
   }
 
   function updateTooltip(pointer, gameObject, building) {
@@ -218,31 +269,28 @@
   function createResource(xLoc, yLoc, typeIndex) {
     switch(typeIndex) {
     case 0:
-      return createMaterialResource(xLoc, yLoc, typeIndex);
+      return createResourceFromDesc(xLoc, yLoc, materialDesc);
     case 1:
-      return createManpowerResource(xLoc, yLoc, typeIndex);
-    default:
-      return createMaterialResource(xLoc, yLoc, typeIndex);
+      return createResourceFromDesc(xLoc, yLoc, manpowerDesc);
     }
   }
 
-  function createMaterialResource(xLoc, yLoc, typeIndex) {
-    let res = resources.create(xLoc, yLoc, "resources", typeIndex);
+  function createResourceFromDesc(xLoc, yLoc, resourceDesc) {
+    let res = resources.create(xLoc, yLoc, "resources", resourceDesc.get("typeIndex"));
     res.setInteractive();
 
-    res.typeDesc = "material";
-    res.clickValue = Math.floor(Math.random() * 5) + 1;
-    res.currCharges = Math.floor(Math.random() * 600) + 1;
-    res.baseMiningChance = Math.random() * 0.1 + 0.8;
+    res.typeIndex = resourceDesc.get("typeIndex");
+    res.typeDesc = resourceDesc.get("typeDesc");
+    res.clickValue = getRandomInt(resourceDesc.get("harvestMin"), resourceDesc.get("harvestRange"));
+    res.currCharges = getRandomInt(resourceDesc.get("chargesMin"), resourceDesc.get("chargesRange"));
+    res.baseMiningChance = getRandomNumber(resourceDesc.get("miningMin"), resourceDesc.get("miningRange"));
+    res.chanceIncrease = getRandomNumber(resourceDesc.get("chanceMin"), resourceDesc.get("chanceRange"));
     res.miningChance = res.baseMiningChance;
-    res.chanceIncrease = Math.random() * 0.05 + 0.025;
 
     res.on('pointerdown', function(pointer) {
       if (res.currCharges > 0 && Math.random() < res.miningChance) {
-        player.material += res.clickValue;
-        res.miningChance = res.baseMiningChance;
+        player.addResourceValue(res);
         updateResourceBoard();
-        res.currCharges--;
         if (res.currCharges == 0 && !res.isTinted) {
           res.setTintFill(0x444444);
         }
@@ -264,42 +312,12 @@
     return res;
   }
 
-  function createManpowerResource(xLoc, yLoc, typeIndex) {
-    let res = resources.create(xLoc, yLoc, "resources", typeIndex);
-    res.setInteractive();
+  function getRandomInt(minimum, range) {
+    return Math.floor(Math.random() * range + minimum);
+  }
 
-    res.typeDesc = "manpower";
-    res.clickValue = Math.floor(Math.random() * 3) + 1;
-    res.currCharges = Math.floor(Math.random() * 50) + 1;
-    res.baseMiningChance = Math.random() * 0.2 + 0.21;
-    res.miningChance = res.baseMiningChance;
-    res.chanceIncrease = Math.random() * 0.05 + 0.025;
-
-    res.on('pointerdown', function(pointer) {
-      if (res.currCharges > 0 && Math.random() < res.miningChance) {
-        player.manpower += res.clickValue;
-        res.miningChance = res.baseMiningChance;
-        updateResourceBoard();
-        res.currCharges--;
-        if (res.currCharges == 0 && !res.isTinted) {
-          res.setTintFill(0x444444);
-        }
-      } else {
-        if (!res.isTinted) {
-          res.miningChance += res.chanceIncrease;
-        }
-      }
-      updateTooltip(null, res);
-    });
-
-    res.on('pointerover', function(pointer, gameObject) {
-      updateTooltip(pointer, this);
-    });
-    res.on('pointerout', function(pointer, gameObject) {
-      $("#resourceTooltip").hide();
-    });
-
-    return res;
+  function getRandomNumber(minimum, range) {
+    return Math.random() * range + minimum;
   }
 
   function weightedRandom(weights) {
