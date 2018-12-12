@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Working Tittle</title>
+  <title>Net Value</title>
   <script src="js/phaser.js"></script>
   <script src="js/player.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
@@ -28,8 +28,10 @@
   var startingTile;
 
   // Resources
+  var resourcesPerTile = 4;
   var resourceSize = 16;
   var resourcePerAxis = tileSize / resourceSize;
+  var resourceMinAppearances = [0, 1];
 
   // Entities
   var buildings;
@@ -42,6 +44,7 @@
   var marker;
   var buildingsPane;
   var camera;
+  var house;
 
   var config = {
     type: Phaser.AUTO,
@@ -94,32 +97,20 @@
 
     camera = this.cameras;
     buildingsPane = this.add.image(camera.main.midPoint.x, 750, "buildingsPane");
+    buildingsPane.setDepth(3);
+    house = this.add.image(buildingsPane.x - buildingsPane.width / 2 + 25, buildingsPane.y, "house").setInteractive();
+    house.setDepth(4);
+    house.tooltipText = "This is a house that automatically mines one random node";
+    house.isSelected = false;
+    house.on("pointerover", function(pointer) {
+      updateTooltip(pointer, null, this);
+      house.isSelected = true;
+    });
+    house.on("pointerout", function(pointer) {
+      $("#buildingTooltip").hide();
+    });
 
     startingTile = createTile(2, 2, 2);
-
-    this.input.on('gameobjectover', function(pointer, gameObject) {
-      updateTooltip(pointer, gameObject);
-    });
-
-    this.input.on('gameobjectout', function(pointer, gameObject) {
-      $(".tooltip").hide();
-    });
-
-    /*
-    $("#showBuildingsButton").click(function() {
-      if (!showBuildings) {
-        $(this).animate({
-          "bottom": "+=100px"
-        }, "slow");
-        showBuildings = true;
-      } else {
-        $(this).animate({
-          "bottom": "-=100px"
-        }, "slow");
-        showBuildings = false;
-      }
-    });
-    */
   }
 
   function update() {
@@ -143,11 +134,12 @@
       marker.setVisible(false);
     }
 
-    if (this.input.manager.activePointer.isDown && tile && tile.isDiscovered && tile.isEmpty) {
-      // buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
-      // tile.isEmpty = false;
+    if (this.input.manager.activePointer.isDown && tile && tile.isDiscovered && tile.isEmpty && house.isSelected) {
+      buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
+      tile.isEmpty = false;
+      house.isSelected = false;
     }
-    if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered && player.manpower >= 10) {
+    if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered && player.manpower >= 10 && !house.isSelected) {
       tile.isDiscovered = true;
       createTile(2, pointerTileX, pointerTileY);
       player.manpower -= 10;
@@ -165,13 +157,20 @@
     }
   }
 
-  function updateTooltip(pointer, gameObject) {
+  function updateTooltip(pointer, gameObject, building) {
     if (pointer) {
-      $(".tooltip").show().css({top: pointer.position.y - 60, left: pointer.position.x + 20});
+      if (gameObject) {
+        $("#resourceTooltip").show().css({top: pointer.position.y - 60, left: pointer.position.x + 20});
+      } else if (building) {
+        $("#buildingTooltip").show().css({top: pointer.position.y - 60, left: pointer.position.x + 20});
+        $("#buildingTooltip p").text(building.tooltipText);
+      }
     }
-    $("#tooltip-value").text(gameObject.clickValue);
-    $("#tooltip-chance").text((Math.round(gameObject.miningChance + "e+2")  + "e-2") * 100 + "%");
-    $("#tooltip-charges").text(gameObject.currCharges);
+    if (gameObject) {
+      $("#tooltip-value").text(gameObject.clickValue);
+      $("#tooltip-chance").text((Math.round(gameObject.miningChance + "e+2")  + "e-2") * 100 + "%");
+      $("#tooltip-charges").text(gameObject.currCharges);
+    }
   }
 
   function updateResourceBoard() {
@@ -185,15 +184,31 @@
     tile.isEmpty = true;
     tile.resources = [];
     tile.freeFields = Array.from(Array(Math.pow(tileSize / resourceSize, 2)).keys());
+    let minAppearances = resourceMinAppearances.slice();
 
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < resourcesPerTile; i++) {
+      let length = minAppearances.length;
+      let typeIndex = 0;
+
+      if (length != 0) {
+        if (minAppearances[length - 1] != 0) {
+          typeIndex = length - 1;
+          minAppearances[length - 1]--;
+        } else {
+          i--;
+          minAppearances.pop();
+          continue;
+        }
+      } else {
+         typeIndex = weightedRandom([0.75, 0.25]);
+      }
+
       var fieldId = tile.freeFields[Math.floor(Math.random() * tile.freeFields.length)];
       tile.freeFields = tile.freeFields.filter(i => i != fieldId);
 
       let xLoc = tile.pixelX + (fieldId % resourcePerAxis) * resourceSize + resourceSize / 2;
       let yLoc = tile.pixelY + (Math.floor(fieldId / resourcePerAxis)) * resourceSize + resourceSize / 2;
 
-      let typeIndex = weightedRandom([0.75, 0.25]);
       tile.resources.push(createResource(xLoc, yLoc, typeIndex));
     }
 
@@ -237,7 +252,14 @@
         }
       }
       updateTooltip(null, res);
-    })
+    });
+
+    res.on('pointerover', function(pointer, gameObject) {
+      updateTooltip(pointer, this);
+    });
+    res.on('pointerout', function(pointer, gameObject) {
+      $("#resourceTooltip").hide();
+    });
 
     return res;
   }
@@ -268,7 +290,14 @@
         }
       }
       updateTooltip(null, res);
-    })
+    });
+
+    res.on('pointerover', function(pointer, gameObject) {
+      updateTooltip(pointer, this);
+    });
+    res.on('pointerout', function(pointer, gameObject) {
+      $("#resourceTooltip").hide();
+    });
 
     return res;
   }
@@ -316,7 +345,7 @@
   </table>
 </div>
 
-<div class="tooltip">
+<div class="tooltip" id="resourceTooltip">
   <table id="tooltipTable">
     <tr>
       <td>
@@ -343,6 +372,11 @@
       </td>
     </tr>
   </table>
+</div>
+<div class="tooltip" id="buildingTooltip">
+  <p>
+    A lot of text
+  </p>
 </div>
 
 </body>
