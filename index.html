@@ -26,6 +26,8 @@
   var tileSize = 64;
   var tileCount = 1;
   var startingTile;
+  var selectedTile;
+  var isMenuOpen = false;
 
   // Resources
   var resourcesPerTile = 4;
@@ -41,9 +43,12 @@
 
   // Player
   var player;
+  var scoutCost = 5;
+  var occupyCost = 20;
 
   // Graphics
-  var marker;
+  var markerRes;
+  var markerTile;
   var buildingsPane;
   var camera;
   var house;
@@ -79,10 +84,10 @@
   function fillResourceDesc() {
     materialDesc.set("typeIndex", 0);
     materialDesc.set("typeDesc", "material");
-    materialDesc.set("harvestMin", 1);
-    materialDesc.set("harvestRange", 5);
-    materialDesc.set("chargesMin", 1);
-    materialDesc.set("chargesRange", 100);
+    materialDesc.set("harvestMin", 3);
+    materialDesc.set("harvestRange", 4);
+    materialDesc.set("chargesMin", 50);
+    materialDesc.set("chargesRange", 25);
     materialDesc.set("miningMin", 0.6);
     materialDesc.set("miningRange", 0.4);
     materialDesc.set("chanceMin", 0.025);
@@ -101,6 +106,9 @@
   }
 
   function create() {
+    this.game.input.mouse.disableContextMenu();
+    addMenuClicks();
+
     buildings = this.physics.add.staticGroup();
     resources = this.physics.add.staticGroup();
     player = new Player();
@@ -119,29 +127,80 @@
     let tiles = map.addTilesetImage("tiles");
     let layer = map.createDynamicLayer(0, tiles, 0, 0);
 
-    marker = this.add.graphics();
-    marker.lineStyle(3, 0x99f, 1);
-    marker.strokeRect(0, 0, resourceSize, resourceSize);
+    markerRes = this.add.graphics();
+    markerRes.lineStyle(2, 0x99f, 1);
+    markerRes.strokeRect(0, 0, resourceSize, resourceSize);
+    markerTile = this.add.graphics();
+    markerTile.lineStyle(3, 0x99f, 1);
+    markerTile.strokeRect(0, 0, tileSize, tileSize);
 
     camera = this.cameras;
-    buildingsPane = this.add.image(camera.main.midPoint.x, 750, "buildingsPane");
+    addHouseToPane(this);
+
+    startingTile = createTile(2, 2, 2);
+    updateResourceBoard();
+  }
+
+  function addHouseToPane(object) {
+    buildingsPane = object.add.image(camera.main.midPoint.x, 750, "buildingsPane");
     buildingsPane.setDepth(3);
-    house = this.add.image(buildingsPane.x - buildingsPane.width / 2 + 25, buildingsPane.y, "house").setInteractive();
+    house = object.add.image(buildingsPane.x - buildingsPane.width / 2 + 25, buildingsPane.y, "house").setInteractive();
     house.setDepth(4);
     house.cost = [30];
     house.tooltipText = "This is a house that automatically mines one random node";
     house.isSelected = false;
     house.on("pointerover", function(pointer) {
       updateTooltip(pointer, null, this);
-      house.isSelected = true;
-      house.setTintFill(0x0000ff);
     });
     house.on("pointerout", function(pointer) {
-      $("#buildingTooltip").hide();
+      $("#buildingsTooltip").hide();
     });
+    house.on("pointerdown", function(pointer) {
+      if (house.isSelected) {
+        house.isSelected = false;
+        house.clearTint();
+      } else {
+        if (player.material >= house.cost[0]) {
+          house.isSelected = true;
+          house.setTintFill(0x0000ff);
+        } else {
+          showInfo("You need at least " + house.cost[0] + " Materials.");
+        }
+      }
+    });
+  }
 
-    startingTile = createTile(2, 2, 2);
-    updateResourceBoard();
+  function addMenuClicks() {
+    $("#menuScout").on("click", function(object) {
+      $("#rightClickMenu").hide();
+      isMenuOpen = false;
+      if (player.manpower >= scoutCost) {
+        showInfo("Scouted a Tile");
+        player.manpower -= scoutCost;
+        updateResourceBoard();
+      } else {
+        showInfo("You need " + scoutCost + " Manpower to scout this field.");
+      }
+    });
+    $("#menuOccupy").on("click", function(object) {
+      $("#rightClickMenu").hide();
+      isMenuOpen = false;
+      if (player.manpower >= occupyCost) {
+        showInfo("Occupied a Tile");
+        player.manpower -= occupyCost;
+        updateResourceBoard();
+      } else {
+        showInfo("You need " + occupyCost + " Manpower to occupy this field.");
+      }
+    });
+  }
+
+  function showInfo(text) {
+    $("#gameInfoBoard p").text(text)
+    $("#gameInfoBoard").show().delay(2000).fadeOut({
+      "duration": 500,
+      "easing": "linear"
+    });
   }
 
   function update() {
@@ -152,17 +211,26 @@
     let pointerTileY = map.worldToTileY(worldPoint.y);
     let pointerX = worldPoint.x;
     let pointerY = worldPoint.y;
-    let markerX = pointerX - pointerX % resourceSize;
-    let markerY = pointerY - pointerY % resourceSize;
+    let markerResX = pointerX - pointerX % resourceSize;
+    let markerResY = pointerY - pointerY % resourceSize;
+    let markerTileX = pointerX - pointerX % tileSize;
+    let markerTileY = pointerY - pointerY % tileSize;
 
     var tile = map.getTileAt(map.worldToTileX(worldPoint.x), map.worldToTileY(worldPoint.y));
 
-    if (tile && tile.isDiscovered) {
-      marker.setVisible(true);
-      marker.x = markerX;
-      marker.y = markerY;
-    } else {
-      marker.setVisible(false);
+    if (!isMenuOpen) {
+      if (tile && tile.isDiscovered) {
+        markerRes.setVisible(true);
+        markerRes.x = markerResX;
+        markerRes.y = markerResY;
+        markerTile.setVisible(false);
+      } else {
+        markerTile.setVisible(true);
+        markerTile.x = markerTileX;
+        markerTile.y = markerTileY;
+        markerRes.setVisible(false);
+        selectedTile = tile;
+      }
     }
 
     if (this.input.manager.activePointer.isDown && tile && tile.isDiscovered && tile.isEmpty && house.isSelected && player.material >= house.cost[0]) {
@@ -175,11 +243,18 @@
       player.material -= house.cost[0];
       updateResourceBoard();
     }
+    /*
     if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered && player.manpower >= 10 && !house.isSelected) {
       tile.isDiscovered = true;
       createTile(2, pointerTileX, pointerTileY);
       player.manpower -= 10;
       updateResourceBoard();
+    }
+    */
+    if (this.input.manager.activePointer.rightButtonDown()) {
+      $("#rightClickMenu").show().css({top: pointerY - 30, left: pointerX + 30});
+      this.input.manager.activePointer.buttons = 0;
+      isMenuOpen = true;
     }
 
     if (frame % 50 == 0) {
@@ -211,10 +286,10 @@
   function updateTooltip(pointer, gameObject, building) {
     if (pointer) {
       if (gameObject) {
-        $("#resourceTooltip").show().css({top: pointer.position.y - 60, left: pointer.position.x + 20});
+        $("#resourceTooltip").show().css({top: pointer.position.y - 90, left: pointer.position.x + 20});
       } else if (building) {
-        $("#buildingTooltip").show().css({top: pointer.position.y - 60, left: pointer.position.x + 20});
-        $("#buildingTooltip p").text(building.tooltipText);
+        $("#buildingsTooltip").show().css({top: pointer.position.y - $("#buildingsTooltip").height() - 20, left: pointer.position.x + 20});;
+        $("#buildingsTooltip p").text(building.tooltipText);
       }
     }
     if (gameObject) {
@@ -313,7 +388,7 @@
   }
 
   function getRandomInt(minimum, range) {
-    return Math.floor(Math.random() * range + minimum);
+    return Math.floor(Math.random() * (range + 1)) + minimum;
   }
 
   function getRandomNumber(minimum, range) {
@@ -346,7 +421,7 @@
   <table id="resourceTable">
     <tr>
       <td>
-        Material
+        Materials
       </td>
       <td id="table-material-value">
         0
@@ -391,9 +466,35 @@
     </tr>
   </table>
 </div>
-<div class="tooltip" id="buildingTooltip">
+<div class="tooltip" id="buildingsTooltip">
   <p>
-    A lot of text
+    Building Tooltip Text
+  </p>
+  <em>Cost:</em>
+  <table>
+    <tr>
+      <td>
+        Materials
+      </td>
+      <td>
+        0
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="tooltip" id="gameInfoBoard">
+  <p>
+    Building Tooltip Text
+  </p>
+</div>
+
+<div id="rightClickMenu">
+  <p id="menuScout">
+    Scout
+  </p>
+  <p id="menuOccupy">
+    Occupy
   </p>
 </div>
 

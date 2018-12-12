@@ -28,6 +28,41 @@
   padding-right: 10px;
 }
 
+#buildingsTooltip {
+  width: 200px;
+}
+
+#gameInfoBoard {
+  top: 10px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  padding-left: 10px;
+}
+
+#rightClickMenu {
+  display: none;
+  position: absolute;
+  border: 2px solid black;
+  font-style: italic;
+  background-color: lightblue;
+  border-radius: 5px;
+  user-select: none;
+}
+
+#rightClickMenu > p {
+  margin: 5px 0px 5px 0px;
+  border-top: 1px solid black;
+  border-bottom: 1px solid black;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+#rightClickMenu > p:hover {
+  border-color: black;
+  background-color: blue;
+  color: lightblue;
+}
+
 /*
 #showBuildingsButton {
   position: absolute;
