@@ -1,9 +1,15 @@
+Empty Update LOOP Resources eats CPU
+
+
 Res-Layer:
 	Mining Shape
 	Manpower -> explore and upgrade
 	Machinepower -> Automat Mine
 	Depletion/Refill
 	Unify nodes
+
+	+Progress:
+		Items
 	
 	+Spikes:
 		CritNodes
@@ -13,16 +19,13 @@ Res-Layer:
 		Trade:
 			Tools
 
-
-
+	
 Trade-Layer:
 	+Res: Goods
 
 
-
 War-Layer:
 	Zones
-
 
 
 Entitiy-Layer:

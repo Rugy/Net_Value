@@ -17,10 +17,14 @@
 
 <script type="text/javascript">
 
+  // Config
   var width = window.screen.width;
   var height = window.screen.height;
   var frame = 0;
   var showBuildings = false;
+  var debugging = false;
+  var currTime;
+  var lastTime = new Date().getTime();
 
   // Tiles
   var tileSize = 64;
@@ -36,6 +40,8 @@
   var resourceMinAppearances = [3, 1];
   var materialDesc = new Map();
   var manpowerDesc = new Map();
+  var rechargeFramesMap = new Map();
+  var selectedResource;
 
   // Entities
   var buildings;
@@ -84,25 +90,27 @@
   function fillResourceDesc() {
     materialDesc.set("typeIndex", 0);
     materialDesc.set("typeDesc", "material");
-    materialDesc.set("harvestMin", 3);
-    materialDesc.set("harvestRange", 4);
-    materialDesc.set("chargesMin", 50);
-    materialDesc.set("chargesRange", 25);
+    materialDesc.set("harvestMin", 1);
+    materialDesc.set("harvestRange", 1);
+    materialDesc.set("chargesMin", 20);
+    materialDesc.set("chargesRange", 10);
     materialDesc.set("miningMin", 0.6);
     materialDesc.set("miningRange", 0.4);
     materialDesc.set("chanceMin", 0.025);
     materialDesc.set("chanceRange", 0.05);
+    materialDesc.set("rechargeRate", 250);
 
     manpowerDesc.set("typeIndex", 1);
     manpowerDesc.set("typeDesc", "manpower");
     manpowerDesc.set("harvestMin", 1);
-    manpowerDesc.set("harvestRange", 2);
+    manpowerDesc.set("harvestRange", 0);
     manpowerDesc.set("chargesMin", 10);
-    manpowerDesc.set("chargesRange", 20);
+    manpowerDesc.set("chargesRange", 5);
     manpowerDesc.set("miningMin", 0.21);
     manpowerDesc.set("miningRange", 0.2);
     manpowerDesc.set("chanceMin", 0.025);
     manpowerDesc.set("chanceRange", 0.1);
+    manpowerDesc.set("rechargeRate", 125);
   }
 
   function create() {
@@ -137,7 +145,7 @@
     camera = this.cameras;
     addHouseToPane(this);
 
-    startingTile = createTile(2, 2, 2);
+    startingTile = createTile(2, getRandomInt(10, 3), getRandomInt(4, 3));
     updateResourceBoard();
   }
 
@@ -188,6 +196,8 @@
       if (player.manpower >= occupyCost) {
         showInfo("Occupied a Tile");
         player.manpower -= occupyCost;
+        selectedTile.isDiscovered = true;
+        createTile(2, selectedTile.x, selectedTile.y);
         updateResourceBoard();
       } else {
         showInfo("You need " + occupyCost + " Manpower to occupy this field.");
@@ -195,15 +205,15 @@
     });
   }
 
-  function showInfo(text) {
-    $("#gameInfoBoard p").text(text)
-    $("#gameInfoBoard").show().delay(2000).fadeOut({
-      "duration": 500,
-      "easing": "linear"
-    });
-  }
-
   function update() {
+    if (debugging) {
+      if (frame % 20 == 0) {
+        currTime = new Date().getTime();
+        console.log("Time Difference in 20 frames: " + (currTime - lastTime));
+        lastTime = currTime;
+      }
+    }
+
     frame++;
     let worldPoint = this.input.activePointer.positionToCamera(this.cameras.main);
 
@@ -243,34 +253,45 @@
       player.material -= house.cost[0];
       updateResourceBoard();
     }
-    /*
-    if (this.input.manager.activePointer.isDown && tile && !tile.isDiscovered && player.manpower >= 10 && !house.isSelected) {
-      tile.isDiscovered = true;
-      createTile(2, pointerTileX, pointerTileY);
-      player.manpower -= 10;
-      updateResourceBoard();
-    }
-    */
     if (this.input.manager.activePointer.rightButtonDown()) {
-      $("#rightClickMenu").show().css({top: pointerY - 30, left: pointerX + 30});
+      if (isMenuOpen) {
+        $("#rightClickMenu").hide();
+        isMenuOpen = false;
+      } else {
+        $("#rightClickMenu").show().css({top: pointerY - 30, left: pointerX + 30});
+        isMenuOpen = true;
+      }
       this.input.manager.activePointer.buttons = 0;
-      isMenuOpen = true;
     }
+
+    rechargeFramesMap.forEach(function(value, key) {
+      if (frame % key == 0) {
+        value.forEach(function (resource) {
+          if (resource.currCharges <= 0 && resource.isTinted) {
+            resource.clearTint();
+          }
+          resource.currCharges++;
+        })
+      }
+    });
 
     if (frame % 50 == 0) {
-      resources.children.iterate(function(child) {
-        if (child.currCharges <= 0 && child.isTinted) {
-          child.clearTint();
-        }
-
-        child.currCharges++;
-      });
-    }
-    if (frame % 20 == 0) {
       buildings.children.iterate(function(child) {
         mineTileRandomly(child.usedTile);
       });
     }
+
+    if (selectedResource) {
+      updateTooltip(null, selectedResource);
+    }
+  }
+
+  function showInfo(text) {
+    $("#gameInfoBoard p").text(text)
+    $("#gameInfoBoard").show().delay(2000).fadeOut({
+      "duration": 500,
+      "easing": "linear"
+    });
   }
 
   function mineTileRandomly(tile) {
@@ -361,6 +382,12 @@
     res.baseMiningChance = getRandomNumber(resourceDesc.get("miningMin"), resourceDesc.get("miningRange"));
     res.chanceIncrease = getRandomNumber(resourceDesc.get("chanceMin"), resourceDesc.get("chanceRange"));
     res.miningChance = res.baseMiningChance;
+    res.rechargeRate = resourceDesc.get("rechargeRate");
+
+    if (rechargeFramesMap.get(res.rechargeRate) == null) {
+      rechargeFramesMap.set(res.rechargeRate, []);
+    }
+    rechargeFramesMap.get(res.rechargeRate).push(res);
 
     res.on('pointerdown', function(pointer) {
       if (res.currCharges > 0 && Math.random() < res.miningChance) {
@@ -379,9 +406,11 @@
 
     res.on('pointerover', function(pointer, gameObject) {
       updateTooltip(pointer, this);
+      selectedResource = this;
     });
     res.on('pointerout', function(pointer, gameObject) {
       $("#resourceTooltip").hide();
+      selectedResource = null;
     });
 
     return res;
