@@ -7,11 +7,6 @@
   <script src="js/player.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
   <link rel="stylesheet" type="text/css" href="css/default.css">
-  <style type="text/css">
-    body {
-      margin: 0;
-    }
-  </style>
 </head>
 <body>
 
@@ -22,7 +17,7 @@
   var height = window.screen.height;
   var frame = 0;
   var showBuildings = false;
-  var debugging = false;
+  var debugging = [true, 250, [100, 100, 100]];
   var currTime;
   var lastTime = new Date().getTime();
 
@@ -37,9 +32,12 @@
   var resourcesPerTile = 4;
   var resourceSize = 16;
   var resourcePerAxis = tileSize / resourceSize;
-  var resourceMinAppearances = [3, 1];
+  var resourceDescriptions = ["Material", "Manpower", "Machinepower"];
+  var resourceMinAppearances = [3, 1, 0];
+  var resourceProbability = [0.70, 0.25, 0.05];
   var materialDesc = new Map();
   var manpowerDesc = new Map();
+  var machinepowerDesc = new Map();
   var rechargeFramesMap = new Map();
   var selectedResource;
 
@@ -89,7 +87,7 @@
 
   function fillResourceDesc() {
     materialDesc.set("typeIndex", 0);
-    materialDesc.set("typeDesc", "material");
+    materialDesc.set("typeDesc", "Material");
     materialDesc.set("harvestMin", 1);
     materialDesc.set("harvestRange", 1);
     materialDesc.set("chargesMin", 20);
@@ -98,10 +96,11 @@
     materialDesc.set("miningRange", 0.4);
     materialDesc.set("chanceMin", 0.025);
     materialDesc.set("chanceRange", 0.05);
-    materialDesc.set("rechargeRate", 250);
+    materialDesc.set("rechargeRate", 500);
+    materialDesc.set("miningTimeout", 50);
 
     manpowerDesc.set("typeIndex", 1);
-    manpowerDesc.set("typeDesc", "manpower");
+    manpowerDesc.set("typeDesc", "Manpower");
     manpowerDesc.set("harvestMin", 1);
     manpowerDesc.set("harvestRange", 0);
     manpowerDesc.set("chargesMin", 10);
@@ -110,7 +109,21 @@
     manpowerDesc.set("miningRange", 0.2);
     manpowerDesc.set("chanceMin", 0.025);
     manpowerDesc.set("chanceRange", 0.1);
-    manpowerDesc.set("rechargeRate", 125);
+    manpowerDesc.set("rechargeRate", 300);
+    manpowerDesc.set("miningTimeout", 80);
+
+    machinepowerDesc.set("typeIndex", 2);
+    machinepowerDesc.set("typeDesc", "Machinepower");
+    machinepowerDesc.set("harvestMin", 1);
+    machinepowerDesc.set("harvestRange", 0);
+    machinepowerDesc.set("chargesMin", 5);
+    machinepowerDesc.set("chargesRange", 2);
+    machinepowerDesc.set("miningMin", 0.05);
+    machinepowerDesc.set("miningRange", 0.05);
+    machinepowerDesc.set("chanceMin", 0.0025);
+    machinepowerDesc.set("chanceRange", 0.005);
+    machinepowerDesc.set("rechargeRate", 1000);
+    machinepowerDesc.set("miningTimeout", 200);
   }
 
   function create() {
@@ -119,7 +132,12 @@
 
     buildings = this.physics.add.staticGroup();
     resources = this.physics.add.staticGroup();
-    player = new Player();
+
+    if (debugging[0]) {
+      player = new Player(debugging[2]);
+    } else {
+      player = new Player();
+    }
 
     let level = [];
 
@@ -146,6 +164,7 @@
     addHouseToPane(this);
 
     startingTile = createTile(2, getRandomInt(10, 3), getRandomInt(4, 3));
+    resourceMinAppearances = [0, 0, 0];
     updateResourceBoard();
   }
 
@@ -206,10 +225,10 @@
   }
 
   function update() {
-    if (debugging) {
-      if (frame % 20 == 0) {
+    if (debugging[0]) {
+      if (frame % debugging[1] == 0) {
         currTime = new Date().getTime();
-        console.log("Time Difference in 20 frames: " + (currTime - lastTime));
+        console.log("Time Difference in " + debugging[1] + " frames: " + (currTime - lastTime));
         lastTime = currTime;
       }
     }
@@ -273,6 +292,17 @@
           resource.currCharges++;
         })
       }
+
+      resources.children.iterate(function(child) {
+        if (child.currTimeout == 1) {
+          if (child.currCharges > 0) {
+            child.clearTint();
+          }
+        }
+        if (child.currTimeout > 0) {
+          child.currTimeout--;
+        }
+      });
     });
 
     if (frame % 50 == 0) {
@@ -307,13 +337,14 @@
   function updateTooltip(pointer, gameObject, building) {
     if (pointer) {
       if (gameObject) {
-        $("#resourceTooltip").show().css({top: pointer.position.y - 90, left: pointer.position.x + 20});
+        $("#resourceTooltip").show().css({top: pointer.position.y - $("#resourceTooltip").height() - 20, left: pointer.position.x + 20});
       } else if (building) {
         $("#buildingsTooltip").show().css({top: pointer.position.y - $("#buildingsTooltip").height() - 20, left: pointer.position.x + 20});;
         $("#buildingsTooltip p").text(building.tooltipText);
       }
     }
     if (gameObject) {
+      $("#resourceTooltip p").text(gameObject.typeDesc);
       $("#tooltip-value").text(gameObject.clickValue);
       $("#tooltip-chance").text((Math.round(gameObject.miningChance + "e+2")  + "e-2") * 100 + "%");
       $("#tooltip-charges").text(gameObject.currCharges);
@@ -323,6 +354,7 @@
   function updateResourceBoard() {
     $("#table-material-value").text(player.material);
     $("#table-manpower-value").text(player.manpower);
+    $("#table-machinepower-value").text(player.machinepower);
   }
 
   function createTile(layout, tileX, tileY) {
@@ -347,7 +379,7 @@
           continue;
         }
       } else {
-         typeIndex = weightedRandom([0.75, 0.25]);
+         typeIndex = weightedRandom(resourceProbability);
       }
 
       var fieldId = tile.freeFields[Math.floor(Math.random() * tile.freeFields.length)];
@@ -368,6 +400,8 @@
       return createResourceFromDesc(xLoc, yLoc, materialDesc);
     case 1:
       return createResourceFromDesc(xLoc, yLoc, manpowerDesc);
+    case 2:
+      return createResourceFromDesc(xLoc, yLoc, machinepowerDesc);
     }
   }
 
@@ -383,6 +417,8 @@
     res.chanceIncrease = getRandomNumber(resourceDesc.get("chanceMin"), resourceDesc.get("chanceRange"));
     res.miningChance = res.baseMiningChance;
     res.rechargeRate = resourceDesc.get("rechargeRate");
+    res.miningTimeout = resourceDesc.get("miningTimeout");
+    res.currTimeout = 0;
 
     if (rechargeFramesMap.get(res.rechargeRate) == null) {
       rechargeFramesMap.set(res.rechargeRate, []);
@@ -390,17 +426,22 @@
     rechargeFramesMap.get(res.rechargeRate).push(res);
 
     res.on('pointerdown', function(pointer) {
-      if (res.currCharges > 0 && Math.random() < res.miningChance) {
-        player.addResourceValue(res);
-        updateResourceBoard();
-        if (res.currCharges == 0 && !res.isTinted) {
-          res.setTintFill(0x444444);
-        }
-      } else {
-        if (!res.isTinted) {
-          res.miningChance += res.chanceIncrease;
+      if (res.currCharges > 0 && res.currTimeout == 0) {
+        if (Math.random() < res.miningChance) {
+          player.addResourceValue(res);
+          updateResourceBoard();
+          res.setTint(0x999999);
+          if (res.currCharges == 0) {
+            res.clearTint();
+            res.setTintFill(0x444444);
+          }
+        } else {
+          if (!res.isTinted) {
+            res.miningChance += res.chanceIncrease;
+          }
         }
       }
+
       updateTooltip(null, res);
     });
 
@@ -464,10 +505,21 @@
         0
       </td>
     </tr>
+    <tr>
+      <td>
+        Machinepower
+      </td>
+      <td id="table-machinepower-value">
+        0
+      </td>
+    </tr>
   </table>
 </div>
 
 <div class="tooltip" id="resourceTooltip">
+  <p>
+    Resource Name
+  </p>
   <table id="tooltipTable">
     <tr>
       <td>

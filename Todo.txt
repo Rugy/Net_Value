@@ -10,6 +10,8 @@ Res-Layer:
 
 	+Progress:
 		Items
+		Stronger tiles:
+			
 	
 	+Spikes:
 		CritNodes
