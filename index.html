@@ -325,12 +325,26 @@
   }
 
   function mineTileRandomly(tile) {
-    let res = tile.resources[Math.floor(Math.random() * 4)];
-    harvestResource(res);
+    let resArr = tile.resources.slice();
+    let resElem;
+
+    do {
+      resElem = resArr[Math.floor(Math.random() * resArr.length)];
+      resArr = resArr.filter(elem => elem != resElem);
+    } while (resArr.length > 0 && resElem.currTimeout != 0);
+
+    if (resElem.currTimeout == 0) {
+      harvestResource(resElem);
+    }
   }
 
   function harvestResource(resource) {
     player.addResourceValue(resource);
+    resource.setTint(0x999999);
+    if (resource.currCharges == 0) {
+      resource.clearTint();
+      resource.setTintFill(0x444444);
+    }
     updateResourceBoard();
   }
 
@@ -428,13 +442,7 @@
     res.on('pointerdown', function(pointer) {
       if (res.currCharges > 0 && res.currTimeout == 0) {
         if (Math.random() < res.miningChance) {
-          player.addResourceValue(res);
-          updateResourceBoard();
-          res.setTint(0x999999);
-          if (res.currCharges == 0) {
-            res.clearTint();
-            res.setTintFill(0x444444);
-          }
+          harvestResource(res);
         } else {
           if (!res.isTinted) {
             res.miningChance += res.chanceIncrease;
