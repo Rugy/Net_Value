@@ -1,387 +1,311 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Net Value</title>
-  <script src="js/phaser.js"></script>
-  <script src="js/player.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
   <link rel="stylesheet" type="text/css" href="css/default.css">
 </head>
+
 <body>
+  <canvas id="canvas"></canvas>
+  <div id="frameCounter">Value</div>
+  <div id="mouseXDiv" class="sysInfo">0</div>
+  <div id="mouseYDiv" class="sysInfo">0</div>
+  <div id="tileDiv" class="sysInfo">Value</div>
+
+  <div class="resourceBoard">
+    <table id="resourceTable">
+    </table>
+  </div>
+
+  <div id="buyMenu">
+    <table id="tipTable">
+    </table>
+  </div>
+
+  <div id="infoBoard">
+    Hello World
+  </div>
+
+  <div id="tooltip">
+    Hello World
+  </div>
+
+  <div id="buildingsBoard">
+  </div>
 
 <script type="text/javascript">
 
-  // Config
-  var width = window.screen.width;
-  var height = window.screen.height;
   var frame = 0;
-  var showBuildings = false;
-  var debugging = [true, 250, [100, 100, 100]];
-  var currTime;
-  var lastTime = new Date().getTime();
+  var gameLoopId;
 
-  // Tiles
-  var tileSize = 64;
-  var tileCount = 1;
-  var startingTile;
-  var selectedTile;
-  var isMenuOpen = false;
+  var canvas = $("#canvas")[0].getContext("2d");
 
-  // Resources
-  var resourcesPerTile = 4;
+  var tileSize = 128;
   var resourceSize = 16;
-  var resourcePerAxis = tileSize / resourceSize;
-  var resourceDescriptions = ["Material", "Manpower", "Machinepower"];
-  var resourceMinAppearances = [3, 1, 0];
-  var resourceProbability = [0.70, 0.25, 0.05];
-  var materialDesc = new Map();
-  var manpowerDesc = new Map();
-  var machinepowerDesc = new Map();
-  var rechargeFramesMap = new Map();
-  var selectedResource;
 
-  // Entities
-  var buildings;
-  var resources;
+  var manpowerDesc = {};
+  var materialDesc = {};
+  var machinepowerDesc = {};
+  var informationDesc = {};
+  var resourceTypes = [manpowerDesc, materialDesc, machinepowerDesc, informationDesc];
+  var metaResources = [informationDesc];
+  var tileDesc = {};
 
-  // Player
-  var player;
-  var scoutCost = 5;
-  var occupyCost = 20;
+  var startingTile;
+  var centerTile = {};
+  var tileGrid = [];
+  var tiles = [];
+  var player = {};
+  var cooldownSet = new Set();
+  var tilesUnlock = 5;
+  var expanded = false;
 
-  // Graphics
-  var markerRes;
-  var markerTile;
-  var buildingsPane;
-  var camera;
-  var house;
+  var resourceAmount = tileSize / resourceSize;
+  var radius = resourceSize / 2;
 
-  var config = {
-    type: Phaser.AUTO,
-    width: width,
-    height: height,
-    physics: {
-        default: 'arcade',
-        arcade: {
-            debug: false
-        }
-    },
-    scene: {
-      preload: preload,
-      create: create,
-      update: update
+  var resourceBoardOpen = false;
+  var buyMenuOpen = false;
+  var selectedTile;
+  var leftClick = {"x": 0, "y": 0};
+  var rightClick = {"x": 0, "y": 0};
+  var mousePos = {"x": 0, "y": 0};
+  var clickCount = 0;
+  var mouseLock = 0;
+  var quality = ["none", "bronze", "silver", "gold", "ember"];
+
+  var Tile = function(description, x, y, unlockScout, unlockBuy, quality, isScouted, isOwned) {
+    this.description = description;
+    this.active = true;
+    this.x = x;
+    this.y = y;
+    this.unlockScout = unlockScout;
+    this.unlockBuy = unlockBuy;
+    this.quality = quality;
+    this.isScouted = isScouted;
+    this.isOwned = isOwned;
+  }
+
+  var ResourceTile = function(tile, x, y, xCenter, yCenter) {
+    this.tile = tile;
+    this.xPos = x;
+    this.yPos = y;
+    this.xCenter = xCenter;
+    this.yCenter = yCenter;
+    this.addResource = function(typeIndex) {
+      this.config = resourceTypes[typeIndex];
+      this.color = this.config.color;
+      this.type = this.config.typeDesc;
+      this.cooldown = 0;
+      this.hasResource = true;
+      this.mouseLockChance = this.config.mouseLockChance;
+      this.mouseLockTime = this.config.mouseLockTime;
     }
-  };
-
-  var game = new Phaser.Game(config);
-
-  function preload() {
-    this.load.image("tiles", "./img/ground.png?v=1");
-    this.load.image("house", "./img/house.png?v=1");
-    this.load.image("buildingsPane", "./img/buildings-pane.png?v=1");
-    this.load.spritesheet("resources", "./img/resources.png?v=1", {frameWidth: resourceSize, frameHeight: resourceSize});
-
-    fillResourceDesc();
   }
 
-  function fillResourceDesc() {
-    materialDesc.set("typeIndex", 0);
-    materialDesc.set("typeDesc", "Material");
-    materialDesc.set("harvestMin", 1);
-    materialDesc.set("harvestRange", 1);
-    materialDesc.set("chargesMin", 20);
-    materialDesc.set("chargesRange", 10);
-    materialDesc.set("miningMin", 0.6);
-    materialDesc.set("miningRange", 0.4);
-    materialDesc.set("chanceMin", 0.025);
-    materialDesc.set("chanceRange", 0.05);
-    materialDesc.set("rechargeRate", 500);
-    materialDesc.set("miningTimeout", 50);
+  function fillDesc() {
+    manpowerDesc.typeIndex = 0;
+    manpowerDesc.typeDesc = "manpower";
+    manpowerDesc.color = "red";
+    manpowerDesc.used = false;
+    manpowerDesc.cooldown = 0;
+    manpowerDesc.miningTimeout = 100;
+    manpowerDesc.mouseLockChance = 0.1;
+    manpowerDesc.mouseLockTime = 100;
 
-    manpowerDesc.set("typeIndex", 1);
-    manpowerDesc.set("typeDesc", "Manpower");
-    manpowerDesc.set("harvestMin", 1);
-    manpowerDesc.set("harvestRange", 0);
-    manpowerDesc.set("chargesMin", 10);
-    manpowerDesc.set("chargesRange", 5);
-    manpowerDesc.set("miningMin", 0.21);
-    manpowerDesc.set("miningRange", 0.2);
-    manpowerDesc.set("chanceMin", 0.025);
-    manpowerDesc.set("chanceRange", 0.1);
-    manpowerDesc.set("rechargeRate", 300);
-    manpowerDesc.set("miningTimeout", 80);
+    informationDesc.typeIndex = 1;
+    informationDesc.typeDesc = "information";
+    informationDesc.color = "white";
+    informationDesc.used = false;
+    informationDesc.cooldown = 0;
+    informationDesc.miningTimeout = 250;
+    informationDesc.mouseLockChance = 0.5;
+    informationDesc.mouseLockTime = 200;
 
-    machinepowerDesc.set("typeIndex", 2);
-    machinepowerDesc.set("typeDesc", "Machinepower");
-    machinepowerDesc.set("harvestMin", 1);
-    machinepowerDesc.set("harvestRange", 0);
-    machinepowerDesc.set("chargesMin", 5);
-    machinepowerDesc.set("chargesRange", 2);
-    machinepowerDesc.set("miningMin", 0.05);
-    machinepowerDesc.set("miningRange", 0.05);
-    machinepowerDesc.set("chanceMin", 0.0025);
-    machinepowerDesc.set("chanceRange", 0.005);
-    machinepowerDesc.set("rechargeRate", 1000);
-    machinepowerDesc.set("miningTimeout", 200);
+    machinepowerDesc.typeIndex = 2;
+    machinepowerDesc.typeDesc = "machinepower";
+    machinepowerDesc.color = "darkblue";
+    machinepowerDesc.used = false;
+    machinepowerDesc.cooldown = 0;
+    machinepowerDesc.miningTimeout = 600;
+    machinepowerDesc.mouseLockChance = 0.9;
+    machinepowerDesc.mouseLockTime = 500;
+
+    tileDesc.description = "This is the standard description"
   }
 
-  function create() {
-    this.game.input.mouse.disableContextMenu();
-    addMenuClicks();
+  function init() {
+    fillDesc();
 
-    buildings = this.physics.add.staticGroup();
-    resources = this.physics.add.staticGroup();
+    $("#canvas").attr("width", ($(window).width()));
+    $("#canvas").attr("height", ($(window).height()));
 
-    if (debugging[0]) {
-      player = new Player(debugging[2]);
-    } else {
-      player = new Player();
-    }
+    $("div").on("contextmenu", function() {
+      return false;
+    });
 
-    let level = [];
-
-    for (let i = 0; i < height / tileSize; i++) {
-      level.push([]);
-
-      for (let j = 0; j < width / tileSize; j++) {
-        level[i].push(0);
+    $("#canvas").on("click", function(event) {
+      let clickedTile = getTile(event.pageX, event.pageY);
+      let clickedResourceTile;
+      if (clickedTile) {
+        clickedResourceTile = getResourceTile(clickedTile, event.pageX, event.pageY);
+        $("#tileDiv").text(clickedTile.description);
       }
-    }
-
-    map = this.make.tilemap({ data: level, tileWidth: tileSize, tileHeight: tileSize });
-    let tiles = map.addTilesetImage("tiles");
-    let layer = map.createDynamicLayer(0, tiles, 0, 0);
-
-    markerRes = this.add.graphics();
-    markerRes.lineStyle(2, 0x99f, 1);
-    markerRes.strokeRect(0, 0, resourceSize, resourceSize);
-    markerTile = this.add.graphics();
-    markerTile.lineStyle(3, 0x99f, 1);
-    markerTile.strokeRect(0, 0, tileSize, tileSize);
-
-    camera = this.cameras;
-    addHouseToPane(this);
-
-    startingTile = createTile(2, getRandomInt(10, 3), getRandomInt(4, 3));
-    resourceMinAppearances = [0, 0, 0];
-    updateResourceBoard();
-  }
-
-  function addHouseToPane(object) {
-    buildingsPane = object.add.image(camera.main.midPoint.x, 750, "buildingsPane");
-    buildingsPane.setDepth(3);
-    house = object.add.image(buildingsPane.x - buildingsPane.width / 2 + 25, buildingsPane.y, "house").setInteractive();
-    house.setDepth(4);
-    house.cost = [30];
-    house.tooltipText = "This is a house that automatically mines one random node";
-    house.isSelected = false;
-    house.on("pointerover", function(pointer) {
-      updateTooltip(pointer, null, this);
-    });
-    house.on("pointerout", function(pointer) {
-      $("#buildingsTooltip").hide();
-    });
-    house.on("pointerdown", function(pointer) {
-      if (house.isSelected) {
-        house.isSelected = false;
-        house.clearTint();
+      if (clickedResourceTile && clickedResourceTile.hasResource && clickedTile.isOwned && clickedResourceTile.cooldown == 0 && mouseLock == 0) {
+        mineResource(clickedResourceTile);
       } else {
-        if (player.material >= house.cost[0]) {
-          house.isSelected = true;
-          house.setTintFill(0x0000ff);
-        } else {
-          showInfo("You need at least " + house.cost[0] + " Materials.");
-        }
+        $("#colorDiv").text("Empty");
       }
-    });
-  }
-
-  function addMenuClicks() {
-    $("#menuScout").on("click", function(object) {
-      $("#rightClickMenu").hide();
-      isMenuOpen = false;
-      if (player.manpower >= scoutCost) {
-        showInfo("Scouted a Tile");
-        player.manpower -= scoutCost;
-        updateResourceBoard();
+      if (buyMenuOpen) {
+        $("#buyMenu").css("display", "none");
+        buyMenuOpen = false;
+      }
+      resolveClick();
+    }).on("contextmenu", function(event) {
+      if (buyMenuOpen) {
+        $("#buyMenu").css("display", "none");
+        buyMenuOpen = false;
       } else {
-        showInfo("You need " + scoutCost + " Manpower to scout this field.");
-      }
-    });
-    $("#menuOccupy").on("click", function(object) {
-      $("#rightClickMenu").hide();
-      isMenuOpen = false;
-      if (player.manpower >= occupyCost) {
-        showInfo("Occupied a Tile");
-        player.manpower -= occupyCost;
-        selectedTile.isDiscovered = true;
-        createTile(2, selectedTile.x, selectedTile.y);
-        updateResourceBoard();
-      } else {
-        showInfo("You need " + occupyCost + " Manpower to occupy this field.");
-      }
-    });
-  }
-
-  function update() {
-    if (debugging[0]) {
-      if (frame % debugging[1] == 0) {
-        currTime = new Date().getTime();
-        console.log("Time Difference in " + debugging[1] + " frames: " + (currTime - lastTime));
-        lastTime = currTime;
-      }
-    }
-
-    frame++;
-    let worldPoint = this.input.activePointer.positionToCamera(this.cameras.main);
-
-    let pointerTileX = map.worldToTileX(worldPoint.x);
-    let pointerTileY = map.worldToTileY(worldPoint.y);
-    let pointerX = worldPoint.x;
-    let pointerY = worldPoint.y;
-    let markerResX = pointerX - pointerX % resourceSize;
-    let markerResY = pointerY - pointerY % resourceSize;
-    let markerTileX = pointerX - pointerX % tileSize;
-    let markerTileY = pointerY - pointerY % tileSize;
-
-    var tile = map.getTileAt(map.worldToTileX(worldPoint.x), map.worldToTileY(worldPoint.y));
-
-    if (!isMenuOpen) {
-      if (tile && tile.isDiscovered) {
-        markerRes.setVisible(true);
-        markerRes.x = markerResX;
-        markerRes.y = markerResY;
-        markerTile.setVisible(false);
-      } else {
-        markerTile.setVisible(true);
-        markerTile.x = markerTileX;
-        markerTile.y = markerTileY;
-        markerRes.setVisible(false);
+        let tile = getTile(event.pageX, event.pageY);
         selectedTile = tile;
-      }
-    }
-
-    if (this.input.manager.activePointer.isDown && tile && tile.isDiscovered && tile.isEmpty && house.isSelected && player.material >= house.cost[0]) {
-      var newBuilding = buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
-      tile.isEmpty = false;
-      newBuilding.isSelected = false;
-      newBuilding.usedTile = tile;
-      house.isSelected = false;
-      house.clearTint();
-      player.material -= house.cost[0];
-      updateResourceBoard();
-    }
-    if (this.input.manager.activePointer.rightButtonDown()) {
-      if (isMenuOpen) {
-        $("#rightClickMenu").hide();
-        isMenuOpen = false;
-      } else {
-        $("#rightClickMenu").show().css({top: pointerY - 30, left: pointerX + 30});
-        isMenuOpen = true;
-      }
-      this.input.manager.activePointer.buttons = 0;
-    }
-
-    rechargeFramesMap.forEach(function(value, key) {
-      if (frame % key == 0) {
-        value.forEach(function (resource) {
-          if (resource.currCharges <= 0 && resource.isTinted) {
-            resource.clearTint();
+        if (tile && !tile.isOwned) {
+          $("#buyMenu").css("display", "inline").css("left", event.pageX).css("top", event.pageY);
+          $("#buyMenu table").empty();
+          if (!tile.isScouted) {
+            $("#buyMenu table").append("<tr id='buyScout'><td>Scout</td><td>" + tile.unlockScout.manpower + "</td></tr>");
+            addScoutBuy();
+          } else if (!tile.isOwned) {
+            $("#buyMenu table").append("<tr id='buyTile'><td>Buy</td><td>" + tile.unlockBuy.manpower + "</td></tr>");
+            addTileBuy();
           }
-          resource.currCharges++;
-        })
+          $("#tipScout").text(tile.unlockScout.manpower);
+        }
+        buyMenuOpen = true;
+      }
+      rightClick.x = event.pageX;
+      rightClick.y = event.pageY;
+      return false;
+    }).on("mousemove", function(event) {
+      mousePos.x = event.pageX;
+      mousePos.y = event.pageY;
+
+      $("#mouseXDiv").text(mousePos.x);
+      $("#mouseYDiv").text(mousePos.y);
+
+      let hoveredTile = getTile(event.pageX, event.pageY);
+      let hoveredResourceTile;
+      if (hoveredTile) {
+        hoveredResourceTile = getResourceTile(hoveredTile, event.pageX, event.pageY);
+      }
+      if (hoveredResourceTile && hoveredResourceTile.hasResource) {
+        $("#tooltip").text(hoveredResourceTile.type);
+      } else if (hoveredTile) {
+        let text = createTileText(hoveredTile);
+        $("#tooltip").html(text);
       }
 
-      resources.children.iterate(function(child) {
-        if (child.currTimeout == 1) {
-          if (child.currCharges > 0) {
-            child.clearTint();
-          }
-        }
-        if (child.currTimeout > 0) {
-          child.currTimeout--;
-        }
-      });
     });
 
-    if (frame % 50 == 0) {
-      buildings.children.iterate(function(child) {
-        mineTileRandomly(child.usedTile);
-      });
+    $("#buyMenu").on("contextmenu", function(event) {
+      $("#buyMenu").css("display", "none");
+      buyMenuOpen = false;
+    });
+
+    player.manpower = 1000;
+    player.information = 0;
+    player.machinepower = 0;
+
+    startingTile = new Tile("This is tile 1", $("#canvas").width() / 2 - tileSize / 2, $("#canvas").height() / 2 - tileSize / 2, {"manpower": 5}, {"manpower": 20}, quality[3], true, true);
+    startingTile.boni = {};
+    startingTile.boni.resourceCount = 2;
+    startingTile.boni.echoIncrase = 0.05;
+    startingTile.boni.crit = {};
+    startingTile.boni.crit.a = getRandomNumber();
+    centerTile = startingTile;
+
+    tiles.push(startingTile);
+    tileGrid.push([startingTile]);
+    canvas.fillStyle = "lightgreen";
+    canvas.fillRect(startingTile.x, startingTile.y, tileSize, tileSize);
+    initTileGrid(startingTile);
+    createTileResources(startingTile, 4, [2, 0, 0, 1], [0.9, 0.1]);
+    drawResources(startingTile);
+  }
+
+  function addScoutBuy() {
+    $("#buyScout").on("click", function(event) {
+      $("#buyMenu").css("display", "none");
+      buyMenuOpen = false;
+      if (player.manpower >= selectedTile.unlockScout.manpower && !selectedTile.isScouted) {
+        expandTile(selectedTile);
+        player.manpower -= selectedTile.unlockScout.manpower;
+        scoutTile(selectedTile);
+        showInfo("Scouted tile " + selectedTile.description);
+      } else {
+        showInfo("You need " + selectedTile.unlockScout.manpower + " manpower");
+      }
+    });
+  }
+
+  function addTileBuy() {
+    $("#buyTile").on("click", function(event) {
+      $("#buyMenu").css("display", "none");
+      buyMenuOpen = false;
+      if (player.manpower >= selectedTile.unlockBuy.manpower && !selectedTile.isOwned) {
+        player.manpower -= selectedTile.unlockBuy.manpower;
+        buyTile(selectedTile);
+        showInfo("Bought tile " + selectedTile.description);
+      } else {
+        showInfo("You need " + selectedTile.unlockBuy.manpower + " manpower");
+      }
+    });
+  }
+
+  function createTileText(tile) {
+    let text = tile.description;
+
+    if (!tile.isScouted) {
+      text += "<br />Not scouted";
+    } else if (!tile.isOwned) {
+      text += "<br />Not owned"
     }
 
-    if (selectedResource) {
-      updateTooltip(null, selectedResource);
-    }
+    return text;
   }
 
   function showInfo(text) {
-    $("#gameInfoBoard p").text(text)
-    $("#gameInfoBoard").show().delay(2000).fadeOut({
-      "duration": 500,
-      "easing": "linear"
-    });
+    $("#infoBoard").css("display", "inline").text(text);
   }
 
-  function mineTileRandomly(tile) {
-    let resArr = tile.resources.slice();
-    let resElem;
-
-    do {
-      resElem = resArr[Math.floor(Math.random() * resArr.length)];
-      resArr = resArr.filter(elem => elem != resElem);
-    } while (resArr.length > 0 && resElem.currTimeout != 0);
-
-    if (resElem.currTimeout == 0) {
-      harvestResource(resElem);
+  function resolveClick() {
+    if (player.manpower >= tilesUnlock && !expanded) {
+      expandTile(startingTile);
+      expanded = true;
     }
   }
 
-  function harvestResource(resource) {
-    player.addResourceValue(resource);
-    resource.setTint(0x999999);
-    if (resource.currCharges == 0) {
-      resource.clearTint();
-      resource.setTintFill(0x444444);
-    }
-    updateResourceBoard();
-  }
+  function initTileGrid(tile) {
+    tile.resourceTiles = [];
 
-  function updateTooltip(pointer, gameObject, building) {
-    if (pointer) {
-      if (gameObject) {
-        $("#resourceTooltip").show().css({top: pointer.position.y - $("#resourceTooltip").height() - 20, left: pointer.position.x + 20});
-      } else if (building) {
-        $("#buildingsTooltip").show().css({top: pointer.position.y - $("#buildingsTooltip").height() - 20, left: pointer.position.x + 20});;
-        $("#buildingsTooltip p").text(building.tooltipText);
+    for (let i = 0; i < resourceAmount; i++) {
+      tile.resourceTiles.push([]);
+
+      for (let j = 0; j < resourceAmount; j++) {
+        let resourceTile = new ResourceTile(tile, i, j, tile.x + i * resourceSize + radius, tile.y + j * resourceSize + radius);
+        tile.resourceTiles[i].push(resourceTile);
       }
     }
-    if (gameObject) {
-      $("#resourceTooltip p").text(gameObject.typeDesc);
-      $("#tooltip-value").text(gameObject.clickValue);
-      $("#tooltip-chance").text((Math.round(gameObject.miningChance + "e+2")  + "e-2") * 100 + "%");
-      $("#tooltip-charges").text(gameObject.currCharges);
-    }
+
+    tile.freeResTiles = [].concat.apply([], tile.resourceTiles);
+    tile.usedResTiles = [];
   }
 
-  function updateResourceBoard() {
-    $("#table-material-value").text(player.material);
-    $("#table-manpower-value").text(player.manpower);
-    $("#table-machinepower-value").text(player.machinepower);
-  }
-
-  function createTile(layout, tileX, tileY) {
-    tile = map.putTileAt(layout, tileX, tileY);
-    tile.isDiscovered = true;
-    tile.isEmpty = true;
-    tile.resources = [];
-    tile.freeFields = Array.from(Array(Math.pow(tileSize / resourceSize, 2)).keys());
-    let minAppearances = resourceMinAppearances.slice();
-
-    for (let i = 0; i < resourcesPerTile; i++) {
-      let length = minAppearances.length;
+  function createTileResources(tile, amount, minAppearances, probability) {
+    for (let i = 0; i < amount; i++) {
       let typeIndex = 0;
+      let length = minAppearances.length;
 
       if (length != 0) {
         if (minAppearances[length - 1] != 0) {
@@ -393,76 +317,239 @@
           continue;
         }
       } else {
-         typeIndex = weightedRandom(resourceProbability);
+        typeIndex = weightedRandom(probability);
       }
 
-      var fieldId = tile.freeFields[Math.floor(Math.random() * tile.freeFields.length)];
-      tile.freeFields = tile.freeFields.filter(i => i != fieldId);
+      let resIndex = getRandomInt(0, tile.freeResTiles.length - 1);
+      let resource = tile.freeResTiles[resIndex];
+      resource.addResource(typeIndex)
 
-      let xLoc = tile.pixelX + (fieldId % resourcePerAxis) * resourceSize + resourceSize / 2;
-      let yLoc = tile.pixelY + (Math.floor(fieldId / resourcePerAxis)) * resourceSize + resourceSize / 2;
-
-      tile.resources.push(createResource(xLoc, yLoc, typeIndex));
-    }
-
-    return tile;
-  }
-
-  function createResource(xLoc, yLoc, typeIndex) {
-    switch(typeIndex) {
-    case 0:
-      return createResourceFromDesc(xLoc, yLoc, materialDesc);
-    case 1:
-      return createResourceFromDesc(xLoc, yLoc, manpowerDesc);
-    case 2:
-      return createResourceFromDesc(xLoc, yLoc, machinepowerDesc);
+      tile.usedResTiles.push(resource);
+      tile.freeResTiles.splice(resIndex, 1);
     }
   }
 
-  function createResourceFromDesc(xLoc, yLoc, resourceDesc) {
-    let res = resources.create(xLoc, yLoc, "resources", resourceDesc.get("typeIndex"));
-    res.setInteractive();
+  function update() {
+    $("#frameCounter").text(frame);
+    frame++;
 
-    res.typeIndex = resourceDesc.get("typeIndex");
-    res.typeDesc = resourceDesc.get("typeDesc");
-    res.clickValue = getRandomInt(resourceDesc.get("harvestMin"), resourceDesc.get("harvestRange"));
-    res.currCharges = getRandomInt(resourceDesc.get("chargesMin"), resourceDesc.get("chargesRange"));
-    res.baseMiningChance = getRandomNumber(resourceDesc.get("miningMin"), resourceDesc.get("miningRange"));
-    res.chanceIncrease = getRandomNumber(resourceDesc.get("chanceMin"), resourceDesc.get("chanceRange"));
-    res.miningChance = res.baseMiningChance;
-    res.rechargeRate = resourceDesc.get("rechargeRate");
-    res.miningTimeout = resourceDesc.get("miningTimeout");
-    res.currTimeout = 0;
+    cooldownSet.forEach(function(resource) {
+      resource.cooldown--;
 
-    if (rechargeFramesMap.get(res.rechargeRate) == null) {
-      rechargeFramesMap.set(res.rechargeRate, []);
+      if (resource.cooldown == 0) {
+        drawCircle(resource.xCenter, resource.yCenter, radius, resource.color);
+        cooldownSet.delete(resource);
+      }
+    });
+
+    if (mouseLock > 0) {
+      if (--mouseLock == 0) {
+        $("canvas").css("cursor", "default");
+      }
     }
-    rechargeFramesMap.get(res.rechargeRate).push(res);
+  }
 
-    res.on('pointerdown', function(pointer) {
-      if (res.currCharges > 0 && res.currTimeout == 0) {
-        if (Math.random() < res.miningChance) {
-          harvestResource(res);
-        } else {
-          if (!res.isTinted) {
-            res.miningChance += res.chanceIncrease;
-          }
+  function buyTile(tile) {
+    canvas.fillStyle = "lightgreen";
+    canvas.fillRect(tile.x, tile.y - 1, tileSize, tileSize + 2);
+    tile.isOwned = true;
+
+    drawResources(tile);
+  }
+
+  function scoutTile(tile) {
+    canvas.fillStyle = "grey";
+    canvas.fillRect(tile.x, tile.y - 1, tileSize, tileSize + 2);
+    tile.isScouted = true;
+
+    drawResources(tile);
+  }
+
+  function drawResources(tile) {
+    for (let i = 0; i < tile.usedResTiles.length; i++) {
+        let resource = tile.usedResTiles[i];
+        drawCircle(resource.xCenter, resource.yCenter, radius, resource.color);
+    }
+  }
+
+  function expandTile(tile) {
+    let xFactor = 0;
+    let yFactor = 0;
+    let newEntry = false;
+
+    for (let i = 0; i < 4; i++) {
+      if (!tile.adjacentN) {
+        xFactor = 0;
+        yFactor = -1;
+        newEntry = true;
+      }
+      if (!tile.adjacentE) {
+        xFactor = 1;
+        yFactor = 0;
+        newEntry = true;
+      }
+      if (!tile.adjacentS) {
+        xFactor = 0;
+        yFactor = 1;
+        newEntry = true;
+      }
+      if (!tile.adjacentW) {
+        xFactor = -1;
+        yFactor = 0;
+        newEntry = true;
+      }
+      if (!newEntry) {
+        break;
+      }
+
+      newTile = new Tile("This is tile " + (tiles.length + 1), tile.x + tileSize * xFactor, tile.y + tileSize * yFactor, {"manpower": tile.unlockScout.manpower + 3}, {"manpower": tile.unlockBuy.manpower + 10}, false, false);
+      newTile.resourceTiles = [];
+
+      linkDirections(newTile);
+      tiles.push(newTile);
+
+      addTileToGrid(tile, newTile);
+
+      initTileGrid(newTile);
+      createTileResources(newTile, 2, [1], [0.6, 0.3, 0.1]);
+
+      canvas.fillStyle = "grey";
+      canvas.fillRect(newTile.x, newTile.y, tileSize, tileSize);
+      newEntry = false;
+    }
+  }
+
+  function addTileToGrid(tile, newTile) {
+    let pos = getTileGridPosition(tile);
+
+    if (newTile.y > tile.y) {
+      if (tileGrid[pos.y + 1]) {
+        xPos = findXGridPos(newTile, pos.y + 1);
+        tileGrid[pos.y + 1].splice(xPos, 0, newTile);
+      } else {
+        tileGrid.push([newTile]);
+      }
+    } else if (newTile.y < tile.y) {
+      if (tileGrid[pos.y - 1]) {
+        xPos = findXGridPos(newTile, pos.y - 1);
+        tileGrid[pos.y - 1].splice(xPos, 0, newTile);
+      } else {
+        tileGrid.unshift([newTile]);
+      }
+    } else if (newTile.y == newTile.y) {
+      xPos = findXGridPos(newTile, pos.y);
+      tileGrid[pos.y].splice(xPos, 0, newTile);
+    }
+  }
+
+  function findXGridPos(tile, y) {
+    let inserted = false;
+    let pos = 0;
+
+    while(!inserted && pos < tileGrid[y].length) {
+      if (tileGrid[y][pos] && tile.x < tileGrid[y][pos].x) {
+        inserted = true;
+      } else {
+        pos++;
+      }
+    }
+
+    return pos;
+  }
+
+  function getTileGridPosition(tile) {
+    for (let i = 0; i < tileGrid.length; i++) {
+      for (let j = 0; j < tileGrid[i].length; j++) {
+        if (tileGrid[i][j] == tile) {
+          return {"x": j, "y": i};
         }
       }
+    }
+  }
 
-      updateTooltip(null, res);
-    });
+  function linkDirections(tile) {
+    let neighbourTile = getTile(tile.x - 10, tile.y + 10);
+    if (neighbourTile) {
+      tile.adjacentW = neighbourTile;
+      neighbourTile.adjacentE = tile;
+    }
+    neighbourTile = getTile(tile.x + 210, tile.y + 10);
+    if (neighbourTile) {
+      tile.adjacentE = neighbourTile;
+      neighbourTile.adjacentW = tile;
+    }
+    neighbourTile = getTile(tile.x + 10, tile.y - 10);
+    if (neighbourTile) {
+      tile.adjacentN = neighbourTile;
+      neighbourTile.adjacentS = tile;
+    }
+    neighbourTile = getTile(tile.x + 10, tile.y + 210);
+    if (neighbourTile) {
+      tile.adjacentS = neighbourTile;
+      neighbourTile.adjacentN = tile;
+    }
+  }
 
-    res.on('pointerover', function(pointer, gameObject) {
-      updateTooltip(pointer, this);
-      selectedResource = this;
-    });
-    res.on('pointerout', function(pointer, gameObject) {
-      $("#resourceTooltip").hide();
-      selectedResource = null;
-    });
+  function getTile(x, y) {
+    let yPos = -1;
+    let xPos = -1;
+    let tileGrids = tileGrid;
 
-    return res;
+    for (let i = 0; i < tileGrid.length; i++) {
+      let tile = tileGrid[i][0];
+      if (tileGrid[i][0].y < y && tileGrid[i][0].y + 128 > y) {
+        yPos = i;
+        break;
+      }
+    }
+
+    if (yPos == -1) {
+      return null;
+    }
+
+    for (let i = 0; i < tileGrid[yPos].length; i++) {
+      if (tileGrid[yPos][i].x < x && tileGrid[yPos][i].x + 128 > x) {
+        xPos = i;
+        break;
+      }
+    }
+
+    if (xPos >= 0) {
+      return tileGrid[yPos][xPos];
+    }
+  }
+
+  function getResourceTile(tile, x, y) {
+    let xOrd = Math.floor((x - tile.x) / resourceSize);
+    let yOrd = Math.floor((y - tile.y) / resourceSize);
+
+    return tile.resourceTiles[xOrd][yOrd];
+  }
+
+  function mineResource(resource) {
+    if (Math.random() < resource.mouseLockChance) {
+      $("canvas").css("cursor", "cell");
+      mouseLock = resource.mouseLockTime;
+    }
+
+    let resourceType = resource.config.typeDesc;
+
+    if (!resourceBoardOpen) {
+      $(".resourceBoard").css("display", "inline");
+    }
+    if (!resource.config.used) {
+      resource.config.used = true;
+      $("#resourceTable").append("<tr><td>" + resourceType.toUpperCase() + "</td><td id='table-" + resourceType + "-value'>0</td></tr>")
+    }
+
+    $("#table-" + resourceType + "-value").text(++player[resourceType]);
+    lockResource(resource);
+  }
+
+  function lockResource(resource) {
+    drawCircle(resource.xCenter, resource.yCenter, radius, "grey");
+    resource.cooldown = resource.config.miningTimeout;
+    cooldownSet.add(resource);
   }
 
   function getRandomInt(minimum, range) {
@@ -493,99 +580,17 @@
 
     return weightSegment;
   }
+
+  function drawCircle(x, y, radius, color) {
+    canvas.beginPath();
+    canvas.ellipse(x, y, radius - 1, radius - 1, 0, 0, Math.PI * 2);
+    canvas.fillStyle = color;
+    canvas.fill();
+  }
+
+  init();
+  gameLoopId = setInterval(update, 20);
+
 </script>
 
-<div class="resourceBoard">
-  <table id="resourceTable">
-    <tr>
-      <td>
-        Materials
-      </td>
-      <td id="table-material-value">
-        0
-      </td>
-    </tr>
-    <tr>
-      <td>
-        Manpower
-      </td>
-      <td id="table-manpower-value">
-        0
-      </td>
-    </tr>
-    <tr>
-      <td>
-        Machinepower
-      </td>
-      <td id="table-machinepower-value">
-        0
-      </td>
-    </tr>
-  </table>
-</div>
-
-<div class="tooltip" id="resourceTooltip">
-  <p>
-    Resource Name
-  </p>
-  <table id="tooltipTable">
-    <tr>
-      <td>
-        Mining Value
-      </td>
-      <td id="tooltip-value">
-        0
-      </td>
-    </tr>
-    <tr>
-      <td>
-        Mining Chance
-      </td>
-      <td id="tooltip-chance">
-        0
-      </td>
-    </tr>
-    <tr>
-      <td>
-        Current Charges
-      </td>
-      <td id="tooltip-charges">
-        0
-      </td>
-    </tr>
-  </table>
-</div>
-<div class="tooltip" id="buildingsTooltip">
-  <p>
-    Building Tooltip Text
-  </p>
-  <em>Cost:</em>
-  <table>
-    <tr>
-      <td>
-        Materials
-      </td>
-      <td>
-        0
-      </td>
-    </tr>
-  </table>
-</div>
-
-<div class="tooltip" id="gameInfoBoard">
-  <p>
-    Building Tooltip Text
-  </p>
-</div>
-
-<div id="rightClickMenu">
-  <p id="menuScout">
-    Scout
-  </p>
-  <p id="menuOccupy">
-    Occupy
-  </p>
-</div>
-
 </body>
-</html>

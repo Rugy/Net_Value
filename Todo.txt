@@ -1,35 +1,113 @@
 Empty Update LOOP Resources eats CPU
 
+References: 
+	NGU
+	Realm Grinder
+	Trimps
+	Civ (War)
+	Industrie Gigant
+	Dice Idle
+	Factory Idle
+	Path of Exile Tree
+	Idle Evolution
+	Fishing: Rod + hook + bait loadout
 
 Res-Layer:
-	Mining Shape
+	Mining Shape:
+		Manual + Unique Machine
+		
 	Manpower -> explore and upgrade
-	Machinepower -> Automat Mine
+	Machinepower -> Automate Mine
 	Depletion/Refill
 	Unify nodes
 	Buidlings boost neighbouring nodes
+	Scout 
+	Resources Inventory?
+	
+	Echo Mining: 
+		Echo in random direction
+		repeat after 50% click cd
+		can trigger itself
+	Arit, Brit, Crit, Drit, Erit Mining
+	# of Crit Rolls Chance 
+	
+	Tree
+		Random Dependency
+		ClickTree
+			Efficiency
+			Phasing
+			Crit
+		BuildingTree
+			Buildings
+			Tiles
+			
+	NodeGrid:
+		Different sturdiness and bonuses for certain resources
+		x by x - size by quality
+		Alterable	
+		small
+		medium
+		large
+		quality
+		
+	
+	Nodes: 
+		Expansion in direction with specific benefits
+		Notable Buffs
+		Storable Bonus
+		Exploration of fields 1/1 - 100/100
 
-	+Progress:
-		Items
+	Gemwordsgrid
+		alter clickradius
+
+	Progress:
+		Unlock Tiles:
+		Items:
+			Permanent Upgradeable Item Tiers
 		Stronger tiles:
 			
-	
-	+Spikes:
+	Spikes:
 		CritNodes
 		
-
-	+Synergy:
+	Synergy:
 		Trade:
 			Tools
-
-	
+			
+	Clicking Timer:
+		click consistency: Click at same frame for great boost
+		clickchain: click at shorter time for increasing boost
+		
+	Obstacles: 
+		First auto building must 2 res next to each other
+		
+	pacifish:
+		Click loadout
+		
+	Resources: 
+		Constr:
+			Manpower: start out with 20, cost for everything incl. clicking
+			Material: Upgrades
+			Machinepower
+		
+		Meta: Percede everything
+			Information: Unlock respresentation of things do not refill
+			Intent: 
+			Influence: Influence rolls && Number of rolls && Guaranteed hit break point
+				
+		Upgrade: 
+			Ki: improve tiles and resources
+			Karma: 
+			K: Upgrade Clicking powers
+			
 Trade-Layer:
-	+Res: Goods
-
+	Res: Goods
+	(Material A - Z)
+	ConversionWheel
+	Dimension Cube (Collect scaling in n dimensions)
 
 War-Layer:
-	Zones
+	Zones:
+		Cont. stream, no entities
 
 
 Entitiy-Layer:
-	Gemwordsgrid

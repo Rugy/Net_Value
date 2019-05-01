@@ -24,6 +24,5 @@ class Player {
 
     resource.miningChance = resource.baseMiningChance;
     resource.currCharges--;
-    resource.currTimeout += resource.miningTimeout;
   }
 }

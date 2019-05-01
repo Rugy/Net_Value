@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Net Value</title>
+  <script src="js/phaser.js"></script>
+  <script src="js/player.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="css/default.css">
+</head>
+<body>
+
+<script type="text/javascript">
+
+  // Tiles
+  var tileSize = 64;
+  var tileCount = 1;
+  var startingTile;
+  var selectedTile;
+  var isMenuOpen = false;
+  var tileDesc = new Map();
+
+  // Resources
+  var resourcesPerTile = 4;
+  var resourceSize = 16;
+  var resourcePerAxis = tileSize / resourceSize;
+  var resourceDescriptions = ["Material", "Manpower", "Machinepower"];
+  var resourceProbability = [0.70, 0.25, 0.05];
+  var materialDesc = new Map();
+  var manpowerDesc = new Map();
+  var machinepowerDesc = new Map();
+  var rechargeFramesMap = new Map();
+  var selectedResource;
+
+  // Entities
+  var buildings;
+  var resources;
+  var tiles = [];
+
+  // Player
+  var player;
+  var scoutCost = 5;
+  var occupyCost = 20;
+
+  // Graphics
+  var markerRes;
+  var markerTile;
+  var buildingsPane;
+  var camera;
+  var house;
+
+  // Config
+  var width = tileSize * 3;
+  var height = tileSize * 3;
+  var frame = 0;
+  var showBuildings = false;
+  var debugging = [true, 250, [100, 100, 100]];
+  var currTime;
+  var lastTime = new Date().getTime();
+
+  var config = {
+    type: Phaser.AUTO,
+    width: width,
+    height: height,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            debug: false
+        }
+    },
+    scene: {
+      preload: preload,
+      create: create,
+      update: update
+    }
+  };
+
+  var game = new Phaser.Game(config);
+
+  function preload() {
+    this.load.image("tiles", "./img/ground.png?v=1");
+    this.load.image("house", "./img/house.png?v=1");
+    this.load.image("buildingsPane", "./img/buildings-pane.png?v=1");
+    this.load.spritesheet("resources", "./img/resources.png?v=1", {frameWidth: resourceSize, frameHeight: resourceSize});
+
+    fillDesc();
+  }
+
+  function fillDesc() {
+    materialDesc.set("typeIndex", 0);
+    materialDesc.set("typeDesc", "Material");
+    materialDesc.set("harvestMin", 1);
+    materialDesc.set("harvestRange", 1);
+    materialDesc.set("chargesMin", 20);
+    materialDesc.set("chargesRange", 10);
+    materialDesc.set("miningMin", 0.6);
+    materialDesc.set("miningRange", 0.4);
+    materialDesc.set("chanceMin", 0.025);
+    materialDesc.set("chanceRange", 0.05);
+    materialDesc.set("rechargeRate", 500);
+    materialDesc.set("miningTimeout", 50);
+    materialDesc.set("mingingDurabilty", 1);
+
+    manpowerDesc.set("typeIndex", 1);
+    manpowerDesc.set("typeDesc", "Manpower");
+    manpowerDesc.set("harvestMin", 1);
+    manpowerDesc.set("harvestRange", 0);
+    manpowerDesc.set("chargesMin", 10);
+    manpowerDesc.set("chargesRange", 5);
+    manpowerDesc.set("miningMin", 0.21);
+    manpowerDesc.set("miningRange", 0.2);
+    manpowerDesc.set("chanceMin", 0.025);
+    manpowerDesc.set("chanceRange", 0.3);
+    manpowerDesc.set("rechargeRate", 300);
+    manpowerDesc.set("miningTimeout", 80);
+    manpowerDesc.set("mingingDurabilty", 2);
+
+    machinepowerDesc.set("typeIndex", 2);
+    machinepowerDesc.set("typeDesc", "Machinepower");
+    machinepowerDesc.set("harvestMin", 1);
+    machinepowerDesc.set("harvestRange", 0);
+    machinepowerDesc.set("chargesMin", 5);
+    machinepowerDesc.set("chargesRange", 2);
+    machinepowerDesc.set("miningMin", 0.05);
+    machinepowerDesc.set("miningRange", 0.05);
+    machinepowerDesc.set("chanceMin", 0.0025);
+    machinepowerDesc.set("chanceRange", 0.005);
+    machinepowerDesc.set("rechargeRate", 1000);
+    machinepowerDesc.set("miningTimeout", 200);
+    machinepowerDesc.set("mingingDurabilty", 5);
+
+    tileDesc.set("resourceCount", 4);
+    tileDesc.set("resourceMinAppearances", [2, 1, 0]);
+    tileDesc.set("resourceProbability", [0.70, 0.25, 0.05]);
+    tileDesc.set("description", "This is the standard description");
+  }
+
+  function create() {
+    this.game.input.mouse.disableContextMenu();
+    addMenuClicks();
+
+    buildings = this.physics.add.staticGroup();
+    resources = this.physics.add.staticGroup();
+
+    if (debugging[0]) {
+      player = new Player(debugging[2]);
+    } else {
+      player = new Player();
+    }
+
+    let level = [];
+
+    for (let i = 0; i < height / tileSize; i++) {
+      level.push([]);
+
+      for (let j = 0; j < width / tileSize; j++) {
+        level[i].push(0);
+      }
+    }
+
+    map = this.make.tilemap({ data: level, tileWidth: tileSize, tileHeight: tileSize });
+    let tilesImage = map.addTilesetImage("tiles");
+    map.createDynamicLayer(0, tilesImage, 0, 0);
+
+    markerRes = this.add.graphics();
+    markerRes.lineStyle(2, 0x99f, 1);
+    markerRes.strokeRect(0, 0, resourceSize, resourceSize);
+    markerRes.cooldown = 0;
+    markerTile = this.add.graphics();
+    markerTile.lineStyle(3, 0x99f, 1);
+    markerTile.strokeRect(0, 0, tileSize, tileSize);
+
+    camera = this.cameras;
+    addHouseToPane(this);
+
+    startingTileDesc = new Map(tileDesc);
+    startingTileDesc.set("description", "This is the very first Tile, it has no bonuses");
+    startingTile = createTile(2, 1, 1, startingTileDesc);
+    startingTile.isScouted = true;
+    startingTile.isOccupied = true;
+    startingTile.mapX = 0;
+    startingTile.mapY = 0;
+
+    map.forEachTile(function(tile) {
+      if (!tile.isScouted) {
+        createTile(0, tile.x, tile.y, createTileBonusesMap(tile));
+      }
+    });
+
+    updateResourceBoard();
+  }
+
+  function createTileBonusesMap(tile) {
+    bonusTileDesc = new Map(tileDesc);
+    tile.mapX = tile.x - startingTile.x;
+    tile.mapY = tile.y - startingTile.y;
+
+    let maxResources = Math.min(Math.abs(tile.mapX) + Math.abs(tile.mapY), 16);
+    bonusTileDesc.set("resourceCount", maxResources);
+    return bonusTileDesc;
+  }
+
+  function addHouseToPane(object) {
+    buildingsPane = object.add.image(camera.main.midPoint.x, 750, "buildingsPane");
+    buildingsPane.setDepth(3);
+    house = object.add.image(buildingsPane.x - buildingsPane.width / 2 + 25, buildingsPane.y, "house").setInteractive();
+    house.setDepth(4);
+    house.cost = [30];
+    house.tooltipText = "This is a house that automatically mines one random node";
+    house.isSelected = false;
+    house.on("pointerover", function(pointer) {
+      updateTooltip(pointer, null, this);
+    });
+    house.on("pointerout", function(pointer) {
+      $("#buildingsTooltip").hide();
+    });
+    house.on("pointerdown", function(pointer) {
+      if (house.isSelected) {
+        house.isSelected = false;
+        house.clearTint();
+      } else {
+        if (player.material >= house.cost[0]) {
+          house.isSelected = true;
+          house.setTintFill(0x0000ff);
+        } else {
+          showInfo("You need at least " + house.cost[0] + " Materials.");
+        }
+      }
+    });
+  }
+
+  function addMenuClicks() {
+    $("#menuScout").on("click", function(object) {
+      $("#rightClickMenu").hide();
+      isMenuOpen = false;
+      if (selectedTile.isScouted) {
+        showInfo("This tile is already scouted.");
+        return;
+      }
+
+      if (player.manpower >= scoutCost) {
+        showInfo("Scouted a Tile");
+        player.manpower -= scoutCost;
+        newTileDesc = new Map(tileDesc);
+        newTileDesc.set("description", "This is tile " + tiles.length);
+        let scoutedTile = createTile(1, selectedTile.x, selectedTile.y, newTileDesc, {"type": "tile", "attribute": "resourceCount", "value": 2, "description": "This tile has 2 additional Patches" });
+        scoutedTile.isScouted = true;
+        showInfo(selectedTile.bonus.description);
+        updateResourceBoard();
+      } else {
+        showInfo("You need " + scoutCost + " Manpower to scout this field.");
+      }
+    });
+    $("#menuOccupy").on("click", function(object) {
+      $("#rightClickMenu").hide();
+      isMenuOpen = false;
+      if (selectedTile.isOccupied) {
+        showInfo("This tile is already occupied.");
+        return;
+      }
+
+      if (player.manpower >= occupyCost && !selectedTile.isOccupied) {
+        showInfo("Occupied a Tile");
+        player.manpower -= occupyCost;
+        newTileDesc = new Map(tileDesc);
+        newTileDesc.set("description", "This is tile " + tiles.length);
+        let occupiedTile = createTile(2, selectedTile.x, selectedTile.y, newTileDesc, {"type": "tile", "attribute": "resourceCount", "value": 2, "description": "This tile has 2 additional Patches" });
+        occupiedTile.isOccupied = true;
+        updateResourceBoard();
+      } else {
+        showInfo("You need " + occupyCost + " Manpower to occupy this field.");
+      }
+    });
+  }
+
+  function update() {
+    if (debugging[0]) {
+      if (frame % debugging[1] == 0) {
+        currTime = new Date().getTime();
+        console.log("Time Difference in " + debugging[1] + " frames: " + (currTime - lastTime));
+        lastTime = currTime;
+      }
+    }
+
+    frame++;
+    let worldPoint = this.input.activePointer.positionToCamera(this.cameras.main);
+
+    let pointerTileX = map.worldToTileX(worldPoint.x);
+    let pointerTileY = map.worldToTileY(worldPoint.y);
+    let pointerX = worldPoint.x;
+    let pointerY = worldPoint.y;
+    let markerResX = pointerX - pointerX % resourceSize;
+    let markerResY = pointerY - pointerY % resourceSize;
+    let markerTileX = pointerX - pointerX % tileSize;
+    let markerTileY = pointerY - pointerY % tileSize;
+
+    var tile = map.getTileAt(map.worldToTileX(worldPoint.x), map.worldToTileY(worldPoint.y));
+
+    if (!isMenuOpen) {
+      selectedTile = tile;
+
+      if (tile && tile.isOccupied) {
+        markerRes.setVisible(true);
+        markerRes.x = markerResX;
+        markerRes.y = markerResY;
+        markerTile.setVisible(false);
+      } else {
+        markerTile.setVisible(true);
+        markerTile.x = markerTileX;
+        markerTile.y = markerTileY;
+        markerRes.setVisible(false);
+      }
+    }
+
+    if (markerRes.cooldown > 0) {
+      markerRes.cooldown--;
+
+      if (markerRes.cooldown == 0) {
+        markerRes.clear()
+        markerRes.lineStyle(2, 0x99f, 1);
+        markerRes.strokeRect(0, 0, resourceSize, resourceSize);
+      }
+    }
+
+    if (this.input.manager.activePointer.isDown && tile && tile.isOccupied && tile.isEmpty && house.isSelected && player.material >= house.cost[0]) {
+      var newBuilding = buildings.create(pointerTileX * tileSize + tileSize / 2, pointerTileY * tileSize + tileSize / 2, "house");
+      tile.isEmpty = false;
+      newBuilding.isSelected = false;
+      newBuilding.usedTile = tile;
+      house.isSelected = false;
+      house.clearTint();
+      player.material -= house.cost[0];
+      updateResourceBoard();
+    }
+
+    if (this.input.manager.activePointer.rightButtonDown()) {
+      if (isMenuOpen) {
+        $("#rightClickMenu").hide();
+        isMenuOpen = false;
+      } else {
+        $("#rightClickMenu").show().css({top: pointerY - 30, left: pointerX + 30});
+        isMenuOpen = true;
+      }
+      this.input.manager.activePointer.buttons = 0;
+    }
+
+    rechargeFramesMap.forEach(function(value, key) {
+      if (frame % key == 0) {
+        value.forEach(function (resource) {
+          if (resource.currCharges <= 0 && resource.isTinted) {
+            resource.clearTint();
+          }
+          resource.currCharges++;
+        })
+      }
+
+      resources.children.iterate(function(child) {
+        if (child.currTimeout == 1) {
+          if (child.currCharges > 0) {
+            child.clearTint();
+          }
+        }
+        if (child.currTimeout > 0) {
+          child.currTimeout--;
+        }
+      });
+    });
+
+    if (frame % 50 == 0) {
+      buildings.children.iterate(function(child) {
+        mineTileRandomly(child.usedTile);
+      });
+    }
+
+    if (selectedResource) {
+      updateTooltip(null, selectedResource);
+    }
+  }
+
+  function showInfo(text) {
+    $("#gameInfoBoard p").text(text);
+    $("#gameInfoBoard").show().delay(2000).fadeOut({
+      "duration": 500,
+      "easing": "linear"
+    });
+  }
+
+  function mineTileRandomly(tile) {
+    let resArr = tile.resources.slice();
+    let resElem;
+
+    do {
+      resElem = resArr[Math.floor(Math.random() * resArr.length)];
+      resArr = resArr.filter(elem => elem != resElem);
+    } while (resArr.length > 0 && resElem.currTimeout != 0);
+
+    if (!resElem) {
+      return;
+    }
+
+    if (resElem.currCharges > 0 && resElem.currTimeout == 0) {
+      harvestResource(resElem);
+    }
+  }
+
+  function harvestResource(resource) {
+    if (Math.random() < resource.miningChance) {
+      player.addResourceValue(resource);
+      resource.setTint(0x999999);
+    } else {
+      resource.setTintFill(0x999999);
+      resource.miningChance += resource.chanceIncrease;
+    }
+    resource.currTimeout += resource.miningTimeout;
+
+    if (resource.currCharges == 0) {
+      resource.clearTint();
+      resource.setTintFill(0x444444);
+    }
+    updateResourceBoard();
+  }
+
+  function updateTooltip(pointer, gameObject, building) {
+    $("#resourceTooltip").hide();
+    $("#buildingsTooltip").hide();
+
+    if (pointer) {
+      if (gameObject) {
+        $("#resourceTooltip").show().css({top: pointer.position.y - $("#resourceTooltip").height() - 20, left: pointer.position.x + 20});
+      } else if (building) {
+        $("#buildingsTooltip").show().css({top: pointer.position.y - $("#buildingsTooltip").height() - 20, left: pointer.position.x + 20});;
+        $("#buildingsTooltip p").text(building.tooltipText);
+      }
+    }
+    if (gameObject) {
+      $("#resourceTooltip p").text(gameObject.typeDesc);
+      $("#tooltip-value").text(gameObject.clickValue);
+      $("#tooltip-chance").text((Math.round(gameObject.miningChance + "e+2")  + "e-2") * 100 + "%");
+      $("#tooltip-charges").text(gameObject.currCharges);
+    }
+  }
+
+  function updateResourceBoard() {
+    $("#table-material-value").text(player.material);
+    $("#table-manpower-value").text(player.manpower);
+    $("#table-machinepower-value").text(player.machinepower);
+  }
+
+  function createTile(layout, tileX, tileY, config, tileBonus) {
+    let tile = map.putTileAt(layout, tileX, tileY);
+    tiles.push(tile);
+    tile.isEmpty = true;
+    tile.resources = [];
+    tile.freeFields = Array.from(Array(Math.pow(tileSize / resourceSize, 2)).keys());
+    tile.config = new Map(config);
+    tile.menuOptions = {scout: true, occupy: true};
+
+    if (tileBonus && tileBonus.type == "tile") {
+      tile.bonus = tileBonus;
+
+      let currentValue = tile.config.get(tileBonus.attribute);
+      tile.config.set(tileBonus.attribute, currentValue + tileBonus.value);
+    }
+
+    let minAppearances = tile.config.get("resourceMinAppearances").slice();
+    let resourceCount = tile.config.get("resourceCount");
+
+    for (let i = 0; i < resourceCount; i++) {
+      let length = minAppearances.length;
+      let typeIndex = 0;
+
+      if (length != 0) {
+        if (minAppearances[length - 1] != 0) {
+          typeIndex = length - 1;
+          minAppearances[length - 1]--;
+        } else {
+          i--;
+          minAppearances.pop();
+          continue;
+        }
+      } else {
+         typeIndex = weightedRandom(resourceProbability);
+      }
+
+      var fieldId = tile.freeFields[Math.floor(Math.random() * tile.freeFields.length)];
+      tile.freeFields = tile.freeFields.filter(i => i != fieldId);
+
+      let xLoc = tile.pixelX + (fieldId % resourcePerAxis) * resourceSize + resourceSize / 2;
+      let yLoc = tile.pixelY + (Math.floor(fieldId / resourcePerAxis)) * resourceSize + resourceSize / 2;
+
+      let res = createResource(xLoc, yLoc, typeIndex);
+      res.tile = tile;
+      tile.resources.push(res);
+
+      if (layout == 1) {
+        res.setAlpha(0.1);
+      }
+    }
+
+    return tile;
+  }
+
+  function createResource(xLoc, yLoc, typeIndex) {
+    switch(typeIndex) {
+    case 0:
+      return createResourceFromDesc(xLoc, yLoc, materialDesc);
+    case 1:
+      return createResourceFromDesc(xLoc, yLoc, manpowerDesc);
+    case 2:
+      return createResourceFromDesc(xLoc, yLoc, machinepowerDesc);
+    }
+  }
+
+  function createResourceFromDesc(xLoc, yLoc, resourceDesc) {
+    let res = resources.create(xLoc, yLoc, "resources", resourceDesc.get("typeIndex"));
+    res.setInteractive();
+
+    res.typeIndex = resourceDesc.get("typeIndex");
+    res.typeDesc = resourceDesc.get("typeDesc");
+    res.clickValue = getRandomInt(resourceDesc.get("harvestMin"), resourceDesc.get("harvestRange"));
+    res.currCharges = getRandomInt(resourceDesc.get("chargesMin"), resourceDesc.get("chargesRange"));
+    res.baseMiningChance = getRandomNumber(resourceDesc.get("miningMin"), resourceDesc.get("miningRange"));
+    res.chanceIncrease = getRandomNumber(resourceDesc.get("chanceMin"), resourceDesc.get("chanceRange"));
+    res.miningChance = res.baseMiningChance;
+    res.rechargeRate = resourceDesc.get("rechargeRate");
+    res.miningTimeout = resourceDesc.get("miningTimeout");
+    res.currTimeout = 0;
+
+    if (rechargeFramesMap.get(res.rechargeRate) == null) {
+      rechargeFramesMap.set(res.rechargeRate, []);
+    }
+    rechargeFramesMap.get(res.rechargeRate).push(res);
+
+    res.on('pointerdown', function(pointer) {
+      if (res.currCharges > 0 && res.currTimeout == 0 && markerRes.cooldown == 0) {
+        harvestResource(res);
+        markerRes.cooldown = 50;
+        markerRes.lineStyle(2, 0xff3333, 1);
+        markerRes.fillStyle(0xff3333, 1.0);
+        markerRes.fillRect(0, 0, resourceSize, resourceSize);
+        markerRes.strokeRect(0, 0, resourceSize, resourceSize);
+      }
+
+      updateTooltip(null, res);
+    });
+
+    res.on('pointerover', function(pointer, gameObject) {
+      if (res.tile.isScouted) {
+        console.log("Scouted");
+      } else {
+        updateTooltip(pointer, this);
+        selectedResource = this;
+      }
+    });
+    res.on('pointerout', function(pointer, gameObject) {
+      $("#resourceTooltip").hide();
+      selectedResource = null;
+    });
+
+    return res;
+  }
+
+  function getRandomInt(minimum, range) {
+    return Math.floor(Math.random() * (range + 1)) + minimum;
+  }
+
+  function getRandomNumber(minimum, range) {
+    return Math.random() * range + minimum;
+  }
+
+  function weightedRandom(weights) {
+    if (!weights || weights.length < 1) {
+      return;
+    }
+
+    var number = Math.random();
+    var segmentSum = weights[0];
+    var weightSegment = 0;
+
+    for (var i = 1; i < weights.length; i++){
+      if (number > segmentSum) {
+        segmentSum += weights[i];
+        weightSegment++;
+      } else {
+        break;
+      }
+    }
+
+    return weightSegment;
+  }
+</script>
+
+<div class="resourceBoard">
+  <table id="resourceTable">
+    <tr>
+      <td>
+        Materials
+      </td>
+      <td id="table-material-value">
+        0
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Manpower
+      </td>
+      <td id="table-manpower-value">
+        0
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Machinepower
+      </td>
+      <td id="table-machinepower-value">
+        0
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="tooltip" id="resourceTooltip">
+  <p>
+    Resource Name
+  </p>
+  <table id="tooltipTable">
+    <tr>
+      <td>
+        Mining Value
+      </td>
+      <td id="tooltip-value">
+        0
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Mining Chance
+      </td>
+      <td id="tooltip-chance">
+        0
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Current Charges
+      </td>
+      <td id="tooltip-charges">
+        0
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="tooltip" id="buildingsTooltip">
+  <p>
+    Building Tooltip Text
+  </p>
+  <em>Cost:</em>
+  <table>
+    <tr>
+      <td>
+        Materials
+      </td>
+      <td>
+        0
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="tooltip" id="gameInfoBoard">
+  <p>
+    Building Tooltip Text
+  </p>
+</div>
+
+<div id="rightClickMenu">
+  <table>
+    <tr>
+      <td id="menuScout">
+        Scout
+      </td>
+      <td>
+        5
+      </td>
+    </tr>
+    <tr>
+      <td id="menuOccupy">
+        Occupy
+      </td>
+      <td>
+        20
+      </td>
+    </tr>
+  </table>
+</div>
+
+</body>
+</html>
