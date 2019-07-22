@@ -1,3 +1,11 @@
+#blackout {
+  position: absolute;
+  background-color: black;
+  width: 100%;
+  height: 100%;
+  display: none;
+}
+
 #frameCounter {
   position: absolute;
   right: 10px;
@@ -19,6 +27,7 @@
   border: 2px solid black;
   padding: 5px;
   font-size: 1.5em;
+  display: none;
 }
 
 #buyMenu {
@@ -32,18 +41,11 @@
   padding-right: 5px;
 }
 
-#infoBoard {
+#info-board {
   position: absolute;
   left: 50%;
   transform: translate(-50%, 0);
   display: none;
-}
-
-#buildingsBoard {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  transform: translate(-50%, 0);
 }
 
 body {
@@ -95,4 +97,87 @@ div {
   width: 2em;
   padding-right: 10px;
   font-weight: bold;
+}
+
+#houseImg {
+}
+
+#buildings-board {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translate(-50%, 0);
+  display: none;
+}
+
+.building-container {
+  display: flex;
+}
+
+.building-category {
+  min-width: 50px;
+  min-height: 50px;
+  border: 1px solid white;
+  border-radius: 6px;
+}
+
+#first-category {
+  background-color: red;
+}
+
+#second-category {
+  background-color: blue;
+}
+
+#third-category {
+  background-color: green;
+}
+
+#fourth-category {
+  background-color: yellow;
+}
+
+#building-selection {
+  min-height: 50px;
+  border-radius: 10px;
+  width: 500px;
+  display: none;
+}
+
+.build-img-selection {
+  border: 2px solid white;
+}
+
+#build-house-selection {
+
+}
+
+.notification {
+  position: absolute;
+  top: 50px;
+  color: red;
+  display: none;
+}
+
+#end-day-button {
+  font-size: large;
+  font-family: cursive;
+  display: none;
+}
+
+#console-print {
+  position: absolute;
+  background-color: grey;
+  bottom: 0px;
+  right: 0px;
+}
+
+#discovery-board {
+  position: absolute;
+  color: blue;
+  left: 50%;
+  bottom: 10px;
+  transform: translate(-50%, 0);
+  font-size: large;
+  display: none;
 }

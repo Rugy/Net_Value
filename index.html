@@ -5,15 +5,16 @@
   <meta charset="UTF-8" />
   <title>Net Value</title>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="main.js" type="module"></script>
   <link rel="stylesheet" type="text/css" href="css/default.css">
 </head>
 
 <body>
+  <div id="blackout">
+  </div>
+
   <canvas id="canvas"></canvas>
-  <div id="frameCounter">Value</div>
-  <div id="mouseXDiv" class="sysInfo">0</div>
-  <div id="mouseYDiv" class="sysInfo">0</div>
-  <div id="tileDiv" class="sysInfo">Value</div>
+  <div id="frameCounter"></div>
 
   <div class="resourceBoard">
     <table id="resourceTable">
@@ -25,572 +26,49 @@
     </table>
   </div>
 
-  <div id="infoBoard">
-    Hello World
+  <div id="info-board">
+    I provide you with Information on Events!
   </div>
 
   <div id="tooltip">
     Hello World
   </div>
 
-  <div id="buildingsBoard">
+  <div id="end-day-button">
+    End the current Day
   </div>
 
-<script type="text/javascript">
-
-  var frame = 0;
-  var gameLoopId;
-
-  var canvas = $("#canvas")[0].getContext("2d");
-
-  var tileSize = 128;
-  var resourceSize = 16;
-
-  var manpowerDesc = {};
-  var materialDesc = {};
-  var machinepowerDesc = {};
-  var informationDesc = {};
-  var resourceTypes = [manpowerDesc, materialDesc, machinepowerDesc, informationDesc];
-  var metaResources = [informationDesc];
-  var tileDesc = {};
-
-  var startingTile;
-  var centerTile = {};
-  var tileGrid = [];
-  var tiles = [];
-  var player = {};
-  var cooldownSet = new Set();
-  var tilesUnlock = 5;
-  var expanded = false;
-
-  var resourceAmount = tileSize / resourceSize;
-  var radius = resourceSize / 2;
-
-  var resourceBoardOpen = false;
-  var buyMenuOpen = false;
-  var selectedTile;
-  var leftClick = {"x": 0, "y": 0};
-  var rightClick = {"x": 0, "y": 0};
-  var mousePos = {"x": 0, "y": 0};
-  var clickCount = 0;
-  var mouseLock = 0;
-  var quality = ["none", "bronze", "silver", "gold", "ember"];
-
-  var Tile = function(description, x, y, unlockScout, unlockBuy, quality, isScouted, isOwned) {
-    this.description = description;
-    this.active = true;
-    this.x = x;
-    this.y = y;
-    this.unlockScout = unlockScout;
-    this.unlockBuy = unlockBuy;
-    this.quality = quality;
-    this.isScouted = isScouted;
-    this.isOwned = isOwned;
-  }
-
-  var ResourceTile = function(tile, x, y, xCenter, yCenter) {
-    this.tile = tile;
-    this.xPos = x;
-    this.yPos = y;
-    this.xCenter = xCenter;
-    this.yCenter = yCenter;
-    this.addResource = function(typeIndex) {
-      this.config = resourceTypes[typeIndex];
-      this.color = this.config.color;
-      this.type = this.config.typeDesc;
-      this.cooldown = 0;
-      this.hasResource = true;
-      this.mouseLockChance = this.config.mouseLockChance;
-      this.mouseLockTime = this.config.mouseLockTime;
-    }
-  }
-
-  function fillDesc() {
-    manpowerDesc.typeIndex = 0;
-    manpowerDesc.typeDesc = "manpower";
-    manpowerDesc.color = "red";
-    manpowerDesc.used = false;
-    manpowerDesc.cooldown = 0;
-    manpowerDesc.miningTimeout = 100;
-    manpowerDesc.mouseLockChance = 0.1;
-    manpowerDesc.mouseLockTime = 100;
-
-    informationDesc.typeIndex = 1;
-    informationDesc.typeDesc = "information";
-    informationDesc.color = "white";
-    informationDesc.used = false;
-    informationDesc.cooldown = 0;
-    informationDesc.miningTimeout = 250;
-    informationDesc.mouseLockChance = 0.5;
-    informationDesc.mouseLockTime = 200;
-
-    machinepowerDesc.typeIndex = 2;
-    machinepowerDesc.typeDesc = "machinepower";
-    machinepowerDesc.color = "darkblue";
-    machinepowerDesc.used = false;
-    machinepowerDesc.cooldown = 0;
-    machinepowerDesc.miningTimeout = 600;
-    machinepowerDesc.mouseLockChance = 0.9;
-    machinepowerDesc.mouseLockTime = 500;
-
-    tileDesc.description = "This is the standard description"
-  }
-
-  function init() {
-    fillDesc();
-
-    $("#canvas").attr("width", ($(window).width()));
-    $("#canvas").attr("height", ($(window).height()));
-
-    $("div").on("contextmenu", function() {
-      return false;
-    });
-
-    $("#canvas").on("click", function(event) {
-      let clickedTile = getTile(event.pageX, event.pageY);
-      let clickedResourceTile;
-      if (clickedTile) {
-        clickedResourceTile = getResourceTile(clickedTile, event.pageX, event.pageY);
-        $("#tileDiv").text(clickedTile.description);
-      }
-      if (clickedResourceTile && clickedResourceTile.hasResource && clickedTile.isOwned && clickedResourceTile.cooldown == 0 && mouseLock == 0) {
-        mineResource(clickedResourceTile);
-      } else {
-        $("#colorDiv").text("Empty");
-      }
-      if (buyMenuOpen) {
-        $("#buyMenu").css("display", "none");
-        buyMenuOpen = false;
-      }
-      resolveClick();
-    }).on("contextmenu", function(event) {
-      if (buyMenuOpen) {
-        $("#buyMenu").css("display", "none");
-        buyMenuOpen = false;
-      } else {
-        let tile = getTile(event.pageX, event.pageY);
-        selectedTile = tile;
-        if (tile && !tile.isOwned) {
-          $("#buyMenu").css("display", "inline").css("left", event.pageX).css("top", event.pageY);
-          $("#buyMenu table").empty();
-          if (!tile.isScouted) {
-            $("#buyMenu table").append("<tr id='buyScout'><td>Scout</td><td>" + tile.unlockScout.manpower + "</td></tr>");
-            addScoutBuy();
-          } else if (!tile.isOwned) {
-            $("#buyMenu table").append("<tr id='buyTile'><td>Buy</td><td>" + tile.unlockBuy.manpower + "</td></tr>");
-            addTileBuy();
-          }
-          $("#tipScout").text(tile.unlockScout.manpower);
-        }
-        buyMenuOpen = true;
-      }
-      rightClick.x = event.pageX;
-      rightClick.y = event.pageY;
-      return false;
-    }).on("mousemove", function(event) {
-      mousePos.x = event.pageX;
-      mousePos.y = event.pageY;
-
-      $("#mouseXDiv").text(mousePos.x);
-      $("#mouseYDiv").text(mousePos.y);
-
-      let hoveredTile = getTile(event.pageX, event.pageY);
-      let hoveredResourceTile;
-      if (hoveredTile) {
-        hoveredResourceTile = getResourceTile(hoveredTile, event.pageX, event.pageY);
-      }
-      if (hoveredResourceTile && hoveredResourceTile.hasResource) {
-        $("#tooltip").text(hoveredResourceTile.type);
-      } else if (hoveredTile) {
-        let text = createTileText(hoveredTile);
-        $("#tooltip").html(text);
-      }
-
-    });
-
-    $("#buyMenu").on("contextmenu", function(event) {
-      $("#buyMenu").css("display", "none");
-      buyMenuOpen = false;
-    });
-
-    player.manpower = 1000;
-    player.information = 0;
-    player.machinepower = 0;
-
-    startingTile = new Tile("This is tile 1", $("#canvas").width() / 2 - tileSize / 2, $("#canvas").height() / 2 - tileSize / 2, {"manpower": 5}, {"manpower": 20}, quality[3], true, true);
-    startingTile.boni = {};
-    startingTile.boni.resourceCount = 2;
-    startingTile.boni.echoIncrase = 0.05;
-    startingTile.boni.crit = {};
-    startingTile.boni.crit.a = getRandomNumber();
-    centerTile = startingTile;
-
-    tiles.push(startingTile);
-    tileGrid.push([startingTile]);
-    canvas.fillStyle = "lightgreen";
-    canvas.fillRect(startingTile.x, startingTile.y, tileSize, tileSize);
-    initTileGrid(startingTile);
-    createTileResources(startingTile, 4, [2, 0, 0, 1], [0.9, 0.1]);
-    drawResources(startingTile);
-  }
-
-  function addScoutBuy() {
-    $("#buyScout").on("click", function(event) {
-      $("#buyMenu").css("display", "none");
-      buyMenuOpen = false;
-      if (player.manpower >= selectedTile.unlockScout.manpower && !selectedTile.isScouted) {
-        expandTile(selectedTile);
-        player.manpower -= selectedTile.unlockScout.manpower;
-        scoutTile(selectedTile);
-        showInfo("Scouted tile " + selectedTile.description);
-      } else {
-        showInfo("You need " + selectedTile.unlockScout.manpower + " manpower");
-      }
-    });
-  }
-
-  function addTileBuy() {
-    $("#buyTile").on("click", function(event) {
-      $("#buyMenu").css("display", "none");
-      buyMenuOpen = false;
-      if (player.manpower >= selectedTile.unlockBuy.manpower && !selectedTile.isOwned) {
-        player.manpower -= selectedTile.unlockBuy.manpower;
-        buyTile(selectedTile);
-        showInfo("Bought tile " + selectedTile.description);
-      } else {
-        showInfo("You need " + selectedTile.unlockBuy.manpower + " manpower");
-      }
-    });
-  }
-
-  function createTileText(tile) {
-    let text = tile.description;
-
-    if (!tile.isScouted) {
-      text += "<br />Not scouted";
-    } else if (!tile.isOwned) {
-      text += "<br />Not owned"
-    }
-
-    return text;
-  }
-
-  function showInfo(text) {
-    $("#infoBoard").css("display", "inline").text(text);
-  }
-
-  function resolveClick() {
-    if (player.manpower >= tilesUnlock && !expanded) {
-      expandTile(startingTile);
-      expanded = true;
-    }
-  }
-
-  function initTileGrid(tile) {
-    tile.resourceTiles = [];
-
-    for (let i = 0; i < resourceAmount; i++) {
-      tile.resourceTiles.push([]);
-
-      for (let j = 0; j < resourceAmount; j++) {
-        let resourceTile = new ResourceTile(tile, i, j, tile.x + i * resourceSize + radius, tile.y + j * resourceSize + radius);
-        tile.resourceTiles[i].push(resourceTile);
-      }
-    }
-
-    tile.freeResTiles = [].concat.apply([], tile.resourceTiles);
-    tile.usedResTiles = [];
-  }
-
-  function createTileResources(tile, amount, minAppearances, probability) {
-    for (let i = 0; i < amount; i++) {
-      let typeIndex = 0;
-      let length = minAppearances.length;
-
-      if (length != 0) {
-        if (minAppearances[length - 1] != 0) {
-          typeIndex = length - 1;
-          minAppearances[length - 1]--;
-        } else {
-          i--;
-          minAppearances.pop();
-          continue;
-        }
-      } else {
-        typeIndex = weightedRandom(probability);
-      }
-
-      let resIndex = getRandomInt(0, tile.freeResTiles.length - 1);
-      let resource = tile.freeResTiles[resIndex];
-      resource.addResource(typeIndex)
-
-      tile.usedResTiles.push(resource);
-      tile.freeResTiles.splice(resIndex, 1);
-    }
-  }
-
-  function update() {
-    $("#frameCounter").text(frame);
-    frame++;
-
-    cooldownSet.forEach(function(resource) {
-      resource.cooldown--;
-
-      if (resource.cooldown == 0) {
-        drawCircle(resource.xCenter, resource.yCenter, radius, resource.color);
-        cooldownSet.delete(resource);
-      }
-    });
-
-    if (mouseLock > 0) {
-      if (--mouseLock == 0) {
-        $("canvas").css("cursor", "default");
-      }
-    }
-  }
-
-  function buyTile(tile) {
-    canvas.fillStyle = "lightgreen";
-    canvas.fillRect(tile.x, tile.y - 1, tileSize, tileSize + 2);
-    tile.isOwned = true;
-
-    drawResources(tile);
-  }
-
-  function scoutTile(tile) {
-    canvas.fillStyle = "grey";
-    canvas.fillRect(tile.x, tile.y - 1, tileSize, tileSize + 2);
-    tile.isScouted = true;
-
-    drawResources(tile);
-  }
-
-  function drawResources(tile) {
-    for (let i = 0; i < tile.usedResTiles.length; i++) {
-        let resource = tile.usedResTiles[i];
-        drawCircle(resource.xCenter, resource.yCenter, radius, resource.color);
-    }
-  }
-
-  function expandTile(tile) {
-    let xFactor = 0;
-    let yFactor = 0;
-    let newEntry = false;
-
-    for (let i = 0; i < 4; i++) {
-      if (!tile.adjacentN) {
-        xFactor = 0;
-        yFactor = -1;
-        newEntry = true;
-      }
-      if (!tile.adjacentE) {
-        xFactor = 1;
-        yFactor = 0;
-        newEntry = true;
-      }
-      if (!tile.adjacentS) {
-        xFactor = 0;
-        yFactor = 1;
-        newEntry = true;
-      }
-      if (!tile.adjacentW) {
-        xFactor = -1;
-        yFactor = 0;
-        newEntry = true;
-      }
-      if (!newEntry) {
-        break;
-      }
-
-      newTile = new Tile("This is tile " + (tiles.length + 1), tile.x + tileSize * xFactor, tile.y + tileSize * yFactor, {"manpower": tile.unlockScout.manpower + 3}, {"manpower": tile.unlockBuy.manpower + 10}, false, false);
-      newTile.resourceTiles = [];
-
-      linkDirections(newTile);
-      tiles.push(newTile);
-
-      addTileToGrid(tile, newTile);
-
-      initTileGrid(newTile);
-      createTileResources(newTile, 2, [1], [0.6, 0.3, 0.1]);
-
-      canvas.fillStyle = "grey";
-      canvas.fillRect(newTile.x, newTile.y, tileSize, tileSize);
-      newEntry = false;
-    }
-  }
-
-  function addTileToGrid(tile, newTile) {
-    let pos = getTileGridPosition(tile);
-
-    if (newTile.y > tile.y) {
-      if (tileGrid[pos.y + 1]) {
-        xPos = findXGridPos(newTile, pos.y + 1);
-        tileGrid[pos.y + 1].splice(xPos, 0, newTile);
-      } else {
-        tileGrid.push([newTile]);
-      }
-    } else if (newTile.y < tile.y) {
-      if (tileGrid[pos.y - 1]) {
-        xPos = findXGridPos(newTile, pos.y - 1);
-        tileGrid[pos.y - 1].splice(xPos, 0, newTile);
-      } else {
-        tileGrid.unshift([newTile]);
-      }
-    } else if (newTile.y == newTile.y) {
-      xPos = findXGridPos(newTile, pos.y);
-      tileGrid[pos.y].splice(xPos, 0, newTile);
-    }
-  }
-
-  function findXGridPos(tile, y) {
-    let inserted = false;
-    let pos = 0;
-
-    while(!inserted && pos < tileGrid[y].length) {
-      if (tileGrid[y][pos] && tile.x < tileGrid[y][pos].x) {
-        inserted = true;
-      } else {
-        pos++;
-      }
-    }
-
-    return pos;
-  }
-
-  function getTileGridPosition(tile) {
-    for (let i = 0; i < tileGrid.length; i++) {
-      for (let j = 0; j < tileGrid[i].length; j++) {
-        if (tileGrid[i][j] == tile) {
-          return {"x": j, "y": i};
-        }
-      }
-    }
-  }
-
-  function linkDirections(tile) {
-    let neighbourTile = getTile(tile.x - 10, tile.y + 10);
-    if (neighbourTile) {
-      tile.adjacentW = neighbourTile;
-      neighbourTile.adjacentE = tile;
-    }
-    neighbourTile = getTile(tile.x + 210, tile.y + 10);
-    if (neighbourTile) {
-      tile.adjacentE = neighbourTile;
-      neighbourTile.adjacentW = tile;
-    }
-    neighbourTile = getTile(tile.x + 10, tile.y - 10);
-    if (neighbourTile) {
-      tile.adjacentN = neighbourTile;
-      neighbourTile.adjacentS = tile;
-    }
-    neighbourTile = getTile(tile.x + 10, tile.y + 210);
-    if (neighbourTile) {
-      tile.adjacentS = neighbourTile;
-      neighbourTile.adjacentN = tile;
-    }
-  }
-
-  function getTile(x, y) {
-    let yPos = -1;
-    let xPos = -1;
-    let tileGrids = tileGrid;
-
-    for (let i = 0; i < tileGrid.length; i++) {
-      let tile = tileGrid[i][0];
-      if (tileGrid[i][0].y < y && tileGrid[i][0].y + 128 > y) {
-        yPos = i;
-        break;
-      }
-    }
-
-    if (yPos == -1) {
-      return null;
-    }
-
-    for (let i = 0; i < tileGrid[yPos].length; i++) {
-      if (tileGrid[yPos][i].x < x && tileGrid[yPos][i].x + 128 > x) {
-        xPos = i;
-        break;
-      }
-    }
-
-    if (xPos >= 0) {
-      return tileGrid[yPos][xPos];
-    }
-  }
-
-  function getResourceTile(tile, x, y) {
-    let xOrd = Math.floor((x - tile.x) / resourceSize);
-    let yOrd = Math.floor((y - tile.y) / resourceSize);
-
-    return tile.resourceTiles[xOrd][yOrd];
-  }
-
-  function mineResource(resource) {
-    if (Math.random() < resource.mouseLockChance) {
-      $("canvas").css("cursor", "cell");
-      mouseLock = resource.mouseLockTime;
-    }
-
-    let resourceType = resource.config.typeDesc;
-
-    if (!resourceBoardOpen) {
-      $(".resourceBoard").css("display", "inline");
-    }
-    if (!resource.config.used) {
-      resource.config.used = true;
-      $("#resourceTable").append("<tr><td>" + resourceType.toUpperCase() + "</td><td id='table-" + resourceType + "-value'>0</td></tr>")
-    }
-
-    $("#table-" + resourceType + "-value").text(++player[resourceType]);
-    lockResource(resource);
-  }
-
-  function lockResource(resource) {
-    drawCircle(resource.xCenter, resource.yCenter, radius, "grey");
-    resource.cooldown = resource.config.miningTimeout;
-    cooldownSet.add(resource);
-  }
-
-  function getRandomInt(minimum, range) {
-    return Math.floor(Math.random() * (range + 1)) + minimum;
-  }
-
-  function getRandomNumber(minimum, range) {
-    return Math.random() * range + minimum;
-  }
-
-  function weightedRandom(weights) {
-    if (!weights || weights.length < 1) {
-      return;
-    }
-
-    var number = Math.random();
-    var segmentSum = weights[0];
-    var weightSegment = 0;
-
-    for (var i = 1; i < weights.length; i++){
-      if (number > segmentSum) {
-        segmentSum += weights[i];
-        weightSegment++;
-      } else {
-        break;
-      }
-    }
-
-    return weightSegment;
-  }
-
-  function drawCircle(x, y, radius, color) {
-    canvas.beginPath();
-    canvas.ellipse(x, y, radius - 1, radius - 1, 0, 0, Math.PI * 2);
-    canvas.fillStyle = color;
-    canvas.fill();
-  }
-
-  init();
-  gameLoopId = setInterval(update, 20);
-
-</script>
+  <div id="buildings-board">
+    <div id="building-containers">
+      <div class="building-container">
+        <div id="first-category" class="building-category">
+        </div>
+        <div id="second-category" class="building-category">
+        </div>
+      </div>
+      <div class="building-container">
+        <div id="third-category" class="building-category">
+        </div>
+        <div id="fourth-category" class="building-category">
+        </div>
+      </div>
+    </div>
+    <div id="building-selection">
+      <img src="img/house.png" id="build-house-selection" class="build-img-selection"/>
+    </div>
+  </div>
+
+  <div id="console-print">
+    <div id="console-player">
+      Print Player
+    </div>
+    <div id="console-tiles">
+      Print Tiles
+    </div>
+  </div>
+
+  <div id="discovery-board">
+    Discover Ending Day
+  </div>
 
 </body>

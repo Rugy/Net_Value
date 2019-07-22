@@ -11,6 +11,9 @@ References:
 	Path of Exile Tree
 	Idle Evolution
 	Fishing: Rod + hook + bait loadout
+	BrainCreator
+	Idle Space
+	Evolve - https://pmotschmann.github.io/Evolve/
 
 Res-Layer:
 	Mining Shape:
@@ -31,6 +34,11 @@ Res-Layer:
 	Arit, Brit, Crit, Drit, Erit Mining
 	# of Crit Rolls Chance 
 	
+	Restart: 
+		End Day:
+			refreshes manpower
+			refreshes resources
+	
 	Tree
 		Random Dependency
 		ClickTree
@@ -49,7 +57,6 @@ Res-Layer:
 		medium
 		large
 		quality
-		
 	
 	Nodes: 
 		Expansion in direction with specific benefits
@@ -57,7 +64,8 @@ Res-Layer:
 		Storable Bonus
 		Exploration of fields 1/1 - 100/100
 
-	Gemwordsgrid
+	Runewordsgrid
+		runes: An Bel Cur Dos Ef
 		alter clickradius
 
 	Progress:
@@ -79,25 +87,37 @@ Res-Layer:
 		
 	Obstacles: 
 		First auto building must 2 res next to each other
+		Manual clicking costs Manpower, might drop to zero
 		
 	pacifish:
 		Click loadout
 		
 	Resources: 
 		Constr:
-			Manpower: start out with 20, cost for everything incl. clicking
-			Material: Upgrades
-			Machinepower
+			Manpower: Start out with 20, cost for everything incl. clicking -> Reduced to Zero: You're too weak, respawn
+			Material: Upgrades and 
+			Machinepower: Automation
 		
 		Meta: Percede everything
-			Information: Unlock respresentation of things do not refill
+			Information: Unlock respresentation of things do not refill, persists reinc, does not replenish
 			Intent: 
 			Influence: Influence rolls && Number of rolls && Guaranteed hit break point
 				
 		Upgrade: 
 			Ki: improve tiles and resources
-			Karma: 
-			K: Upgrade Clicking powers
+			Karma: Influence Luck
+			K: Upgrade Clicking powers on each click
+			
+	Buildings: 
+		Harversters: 1x1, 2x2, 2x1... 1 of each
+		linkers: 
+			transmit ticks from structure to linked structures after x frames
+		amplifyers: 
+			circular overlayst
+			ransmit clicks to after x frames
+			
+	Digging: 
+		once per tile
 			
 Trade-Layer:
 	Res: Goods
