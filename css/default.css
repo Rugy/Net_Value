@@ -6,12 +6,6 @@
   display: none;
 }
 
-#frameCounter {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-}
-
 #canvas {
   background-color: white;
   margin: 0;
@@ -102,19 +96,15 @@ div {
 #houseImg {
 }
 
-#buildings-board {
+#selection-board {
   position: absolute;
   left: 50%;
   bottom: 10px;
   transform: translate(-50%, 0);
-  display: none;
+    display: flex;
 }
 
-.building-container {
-  display: flex;
-}
-
-.building-category {
+.selection-category {
   min-width: 50px;
   min-height: 50px;
   border: 1px solid white;
@@ -122,34 +112,51 @@ div {
 }
 
 #first-category {
-  background-color: red;
+  background-color: blue;
+  display: none;
 }
 
 #second-category {
-  background-color: blue;
-}
-
-#third-category {
   background-color: green;
+  display: none;
 }
 
-#fourth-category {
-  background-color: yellow;
+#discovery-selection {
+  min-height: 50px;
+  border-radius: 10px;
+  border: 2px solid blue;
+  width: 200px;
+  background-color: white;
+  display: none;
+  align-items: center;
+}
+
+#discovery-option-1 {
+  text-align: center;
+  width: 100%;
+  padding-left: 5px;
+  padding-right: 5px;
 }
 
 #building-selection {
   min-height: 50px;
   border-radius: 10px;
-  width: 500px;
+  border: 2px solid green;
+  width: 200px;
   display: none;
+  background-color: white;
 }
 
 .build-img-selection {
-  border: 2px solid white;
+  border: 2px solid green;
+  height: 40px;
 }
 
 #build-house-selection {
-
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 5px;
 }
 
 .notification {
@@ -174,7 +181,7 @@ div {
 
 #discovery-board {
   position: absolute;
-  color: blue;
+  color: white;
   left: 50%;
   bottom: 10px;
   transform: translate(-50%, 0);

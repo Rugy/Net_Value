@@ -5,7 +5,9 @@ export const render = {
   tiles: [],
   tileGrdid: [],
   tileSize: 128,
+  resourceSize: 8,
   buildings: [],
+  resourceTileWarnings: new Set(),
 
   selectedTile: {},
 
@@ -20,10 +22,24 @@ export const render = {
     }
   },
 
+  drawResourceTileWarnings: function() {
+    this.resourceTileWarnings.forEach(resource => {
+      if (resource.warningLock > 0) {
+        this.canvas.fillStyle = "red";
+        this.canvas.globalAlpha = resource.warningLock / 100;
+        this.canvas.fillRect(resource.xCenter - resourceSize / 2, resource.yCenter - resourceSize / 2, resourceSize, resourceSize);
+        resource.warningLock--;
+        this.canvas.globalAlpha = 1;
+      } else {
+        this.resourceTileWarnings.delete(resource);
+      }
+    });
+  },
+
   drawResources: function(tile) {
     for (let i = 0; i < tile.usedResTiles.length; i++) {
-        let resource = tile.usedResTiles[i];
-        this.drawCircle(resource.xCenter, resource.yCenter, radius, resource.color);
+      let resource = tile.usedResTiles[i];
+      this.drawCircle(resource.xCenter, resource.yCenter, radius, resource.color);
     }
   },
 
@@ -36,12 +52,13 @@ export const render = {
 
   drawBuildings: function() {
     for (let i = 0; i < this.buildings.length; i++) {
-      this.canvas.drawImage(this.buildings[i].type, this.buildings[i].x, this.buildings[i].y);
+      this.canvas.drawImage(this.buildings[i].type.image, this.buildings[i].x, this.buildings[i].y);
     }
   },
 
   draw: function() {
     this.drawTiles();
+    this.drawResourceTileWarnings();
     for (let i = 0; i < this.tiles.length; i++) {
       if (this.tiles[i].isScouted) {
         this.drawResources(this.tiles[i]);

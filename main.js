@@ -1,5 +1,5 @@
 import { resourceTypes }  from "./resourceTypes.js";
-import { util, notifications, mouse, cooldownSet }  from "./util.js";
+import { util, notifications, mouse, cooldownSet, getRandomInt }  from "./util.js";
 import { render }  from "./render.js";
 import { initialize }  from "./initialize.js";
 import { player }  from "./player.js";
@@ -10,6 +10,8 @@ import { buildings } from "./buildings.js";
 import { currentDay } from "./day.js";
 import { showInfo, infoBoardOpacity, setInfoBoardOpacity } from "./infoBoard.js";
 
+window.variables = 50;
+
 $(document).ready(function() {
   var frame = 0;
   var gameLoopId;
@@ -19,7 +21,7 @@ $(document).ready(function() {
   var expanded = false;
 
   function update() {
-    // $("#frameCounter").text(frame);
+    $("#frameCounter").text(frame);
     frame++;
 
     cooldownSet.forEach(function(resource) {
@@ -40,7 +42,7 @@ $(document).ready(function() {
     render.draw();
 
     if(buildings.buildingSelected && mouse.mouseInsideTile && buildings.buildingShadow) {
-      render.canvas.drawImage(buildings.buildingShadow.type, buildings.buildingShadow.x, buildings.buildingShadow.y);
+      render.canvas.drawImage(buildings.buildingShadow.type.image, buildings.buildingShadow.x, buildings.buildingShadow.y);
     }
 
     if (frame % 5 == 0) {
@@ -53,7 +55,7 @@ $(document).ready(function() {
           notifications.shift();
           $(div).remove();
         }
-      })
+      });
 
       if (infoBoardOpacity > 0) {
         setInfoBoardOpacity(infoBoardOpacity - 0.05);
@@ -63,6 +65,16 @@ $(document).ready(function() {
         $("#info-board").css("opacity", infoBoardOpacity);
       }
     }
+
+    render.buildings.forEach(building => {
+      if (building.currentCooldown == 0) {
+        let resourceChoice = getRandomInt(0, building.usedResoures.length - 1);
+        building.usedResoures[resourceChoice].mineResource();
+        building.currentCooldown += building.type.miningCooldown;
+      } else {
+        building.currentCooldown--;
+      }
+    });
 
     if (currentDay.dayStarting) {
       $("#blackout").css("opacity", "-=0.01");

@@ -14,7 +14,6 @@
   </div>
 
   <canvas id="canvas"></canvas>
-  <div id="frameCounter"></div>
 
   <div class="resourceBoard">
     <table id="resourceTable">
@@ -38,23 +37,20 @@
     End the current Day
   </div>
 
-  <div id="buildings-board">
-    <div id="building-containers">
-      <div class="building-container">
-        <div id="first-category" class="building-category">
-        </div>
-        <div id="second-category" class="building-category">
-        </div>
-      </div>
-      <div class="building-container">
-        <div id="third-category" class="building-category">
-        </div>
-        <div id="fourth-category" class="building-category">
-        </div>
-      </div>
+  <div id="selection-board">
+    <div id="first-category" class="selection-category">
     </div>
-    <div id="building-selection">
-      <img src="img/house.png" id="build-house-selection" class="build-img-selection"/>
+    <div id="second-category" class="selection-category">
+    </div>
+    <div id="selection-menu">
+      <div id="building-selection">
+        <img src="img/house.png" id="build-house-selection" class="build-img-selection"/>
+      </div>
+      <div id="discovery-selection">
+        <div id="discovery-option-1">
+          Discover Ending Day
+        </div>
+      </div>
     </div>
   </div>
 
@@ -65,10 +61,12 @@
     <div id="console-tiles">
       Print Tiles
     </div>
-  </div>
-
-  <div id="discovery-board">
-    Discover Ending Day
+    <div id="console-buildings">
+      Print Buildings
+    </div>
+    <div id="frameCounter">
+      0
+    </div>
   </div>
 
 </body>

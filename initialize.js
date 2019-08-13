@@ -1,16 +1,19 @@
 import { player }  from "./player.js";
 import { Building, buildings, importImages, images, getBuildingCoords, buildInsideTile,
-  constructBuilding } from "./buildings.js"
+  constructBuilding, buildingTypes } from "./buildings.js"
 import { render }  from "./render.js";
 import { Tile, TileBonus, tileSize, createFirstTile } from "./tile.js";
 import { radius, quality, resourceSize } from "./resourceTile.js";
 import { Day, restartDay, setCurrentDay } from "./day.js";
 import { mouse, getRandomInt, getRandomNumber, createTileText, createResourceText,
-  setupBuildingPane } from "./util.js";
+  setupSelectionBoard } from "./util.js";
 import { showInfo } from "./infoBoard.js";
 import { discoveryStatus, discover, discoverySequence, discoveryCount } from "./discovery.js";
+import { setupProgress } from "./testing.js";
 
 export function initialize() {
+  let debug = true;
+
   let day = new Day(1);
   setCurrentDay(day);
 
@@ -27,6 +30,10 @@ export function initialize() {
 
   $("#console-tiles").on("click", function() {
     console.log(render.tiles);
+  })
+
+  $("#console-buildings").on("click", function() {
+    console.log(render.resource);
   })
 
   importImages();
@@ -91,12 +98,11 @@ export function initialize() {
       $("#tooltip").html(text);
     }
 
-    if (buildings.buildingSelected && mouse.mouseInsideTile) {
+    if (buildings.buildingSelected) {
       let pos = getBuildingCoords(mouse.mousePos.x, mouse.mousePos.y);
       if (buildInsideTile(pos.x, pos.y)) {
-        buildings.buildingShadow = new Building(images.houseImage, pos.x, pos.y);
-      } else {
-        buildings.buildingShadow = null;
+        buildings.buildingShadow.x = pos.x;
+        buildings.buildingShadow.y = pos.y;
       }
     }
   });
@@ -108,25 +114,36 @@ export function initialize() {
 
   $("#build-house-selection").on("click", function() {
     buildings.buildingSelected = !buildings.buildingSelected;
+    if (buildings.buildingSelected) {
+      buildings.buildingShadow = new Building(buildingTypes.house, $(window).width() / 2, $(window).height() / 2);
+    } else {
+      buildings.buildingShadow = null;
+    }
   })
 
   $("#end-day-button").on("click", function() {
     restartDay();
   })
 
-  $("#discovery-board").on("click", function() {
+  $("#discovery-selection").on("click", function() {
     discover();
   })
 
-  setupBuildingPane();
+
+
+  setupSelectionBoard();
 
   render.canvas = $("#canvas")[0].getContext("2d");;
 
   createFirstTile();
 
   setTimeout(function() {
-    $("#discovery-board").show();
+    $("#first-category").show();
   }, 10000);
+
+  if (debug) {
+    setupProgress();
+  }
 }
 
 function addScoutBuy() {

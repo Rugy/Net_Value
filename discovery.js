@@ -15,9 +15,12 @@ export const discoveryStatus = {
 }
 
 export function discover() {
+  if (discoverySequence[discoveryCount] == null) {
+    return false;
+  }
   if (discoverySequence[discoveryCount].cost > player.information) {
     showInfo("Not enough Information");
-    return;
+    return false;
   } else {
     player.information -= discoverySequence[discoveryCount].cost;
     resourceBoard.updateResourceBoard();
@@ -28,10 +31,12 @@ export function discover() {
   discoverySequence[discoveryCount].discoverThis();
   discoveryCount++;
   if (discoverySequence[discoveryCount] != null) {
-    $("#discovery-board").text(discoverySequence[discoveryCount].description);
+    $("#discovery-option-1").text(discoverySequence[discoveryCount].description);
   } else {
-    $("#discovery-board").hide();
+    $("#discovery-option-1").hide();
   }
+
+  return true;
 }
 
 export const discoverySequence = [
@@ -87,7 +92,25 @@ export const discoverySequence = [
     description: "Discover Tooltip",
     cost: 2,
     discoverThis: function() {
-
+      $("#tooltip").show();
+    }
+  },
+  {
+    statusDesc: "notification",
+    itemId: "notification",
+    description: "Discover Notifications",
+    cost: 2,
+    discoverThis: function() {
+      $('<style>.notification { display: inline; }</style>').appendTo('head');
+    }
+  },
+  {
+    statusDesc: "buildingsBoard",
+    itemId: "second-category",
+    description: "Discover Building Selection",
+    cost: 2,
+    discoverThis: function() {
+      $("#second-category").show();
     }
   }
 ]

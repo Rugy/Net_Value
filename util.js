@@ -2,8 +2,6 @@ export const util = {
 
 }
 
-export let selectedCategory = {};
-
 export const notifications = [];
 
 export const cooldownSet = new Set();
@@ -48,57 +46,60 @@ export function createResourceText(resource) {
   return text;
 }
 
-export function setupBuildingPane() {
-  $("#first-category").on("click", function() {
-    if (checkCategorySelection(this)) {
-      $(this).css("background", "radial-gradient(white -100%, red");
-      selectedCategory = this;
-      expandBuildSelection("red");
+export function setupSelectionBoard() {
+  $(categories.discovery.buttonId).on("click", function() {
+    if (categories.selectedCategory == null) {
+      $(categories.discovery.buttonId).css("background", "radial-gradient(white -100%, blue");
+      $(categories.discovery.menuId).css("display", "flex");
+      categories.selectedCategory = categories.discovery;
+    } else if (categories.selectedCategory == categories.discovery) {
+      $(categories.discovery.buttonId).css("background", "");
+      $(categories.discovery.menuId).hide();
+      categories.selectedCategory = null;
+    } else {
+      categories.hideAll();
+      $(categories.discovery.buttonId).css("background", "radial-gradient(white -100%, blue");
+      $(categories.discovery.menuId).css("display", "flex");
+      categories.selectedCategory = categories.discovery;
     }
   });
 
-  $("#second-category").on("click", function() {
-    if (checkCategorySelection(this)) {
-      $(this).css("background", "radial-gradient(white -100%, blue");
-      selectedCategory = this;
-      expandBuildSelection("blue");
-    }
-  });
-
-  $("#third-category").on("click", function() {
-    if (checkCategorySelection(this)) {
-      $(this).css("background", "radial-gradient(white -100%, green");
-      selectedCategory = this;
-      expandBuildSelection("green");
-    }
-  });
-
-  $("#fourth-category").on("click", function() {
-    if (checkCategorySelection(this)) {
-      $(this).css("background", "radial-gradient(white -100%, yellow");
-      selectedCategory = this;
-      expandBuildSelection("yellow");
+  $(categories.building.buttonId).on("click", function() {
+    if (categories.selectedCategory == null) {
+      $(categories.building.buttonId).css("background", "radial-gradient(white -100%, green");
+      $(categories.building.menuId).show();
+      categories.selectedCategory = categories.building;
+    } else if (categories.selectedCategory == categories.building) {
+      $(categories.building.buttonId).css("background", "");
+      $(categories.building.menuId).hide();
+      categories.selectedCategory = null;
+    } else {
+      categories.hideAll();
+      $(categories.building.buttonId).css("background", "radial-gradient(white -100%, green");
+      $(categories.building.menuId).show();
+      categories.selectedCategory = categories.building;
     }
   });
 }
 
-export function expandBuildSelection(color) {
-  $("#building-selection").css({
-    "background": function() {
-      return color;
-    },
-  }).show(250);
-}
+export let categories = {
+  selectedCategory: null,
+  discovery: {
+    buttonId: "#first-category",
+    menuId: "#discovery-selection",
+    color: "blue"
+  },
+  building: {
+    buttonId: "#second-category",
+    menuId: "#building-selection",
+    color: "green"
+  },
 
-export function checkCategorySelection(category) {
-  if (selectedCategory != null) {
-    $(selectedCategory).css("background", "");
+  hideAll: function() {
+    $(categories.discovery.menuId).hide();
+    $(categories.discovery.buttonId).css("background", "");
+    $(categories.building.menuId).hide();
+    $(categories.building.buttonId).css("background", "");
+    this.selectedCategory = null;
   }
-  if (selectedCategory == category) {
-    $(selectedCategory).css("background", "");
-    selectedCategory = null;
-    $("#building-selection").hide(250);
-    return false;
-  }
-  return true;
 }

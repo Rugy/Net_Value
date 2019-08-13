@@ -11,6 +11,7 @@ export class ResourceTile {
     this.yPos = y;
     this.xCenter = xCenter;
     this.yCenter = yCenter;
+    this.warningLock = 0;
   }
 
   addResource(type) {
@@ -61,6 +62,10 @@ export class ResourceTile {
       this.cooldown = this.miningTimeout;
       cooldownSet.add(this);
     }
+  }
+
+  showWarning() {
+    this.warningLock = 100;
   }
 }
 

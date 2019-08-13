@@ -115,6 +115,8 @@ Res-Layer:
 		amplifyers: 
 			circular overlayst
 			ransmit clicks to after x frames
+		fibonnaci square field increase for special actions
+		intervalls with spikes
 			
 	Digging: 
 		once per tile
